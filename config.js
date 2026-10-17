@@ -24,6 +24,16 @@ window.APP_CONFIG = {
     acessos: "Acessos"
   },
 
+  // Logótipos dos parceiros: o nome tem de coincidir com o escrito em Projecto > implementadores / financiador.
+  LOGOS: {
+    "FNDS": "assets/img/logos/fnds.png",
+    "ProAzul": "assets/img/logos/proazul.png",
+    "Biofund": "assets/img/logos/biofund.png",
+    "Banco Mundial": "assets/img/logos/worldbank.png",
+    "World Bank": "assets/img/logos/worldbank.png",
+    "MozRural": "assets/img/logos/mozrural.png"
+  },
+
   // Limiares do estado de cada indicador (percentagem da meta).
   LIMIARES: { atingido: 100, emCurso: 70 }
 };

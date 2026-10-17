@@ -82,21 +82,38 @@
     };
 
     // ---------- Capa ----------
+    const L = window.APP_CONFIG.LOGOS || {};
+    const logoSrc = (name) => { const k = Object.keys(L).find((x) => x.toLowerCase() === String(name).trim().toLowerCase()); return k ? L[k] : null; };
+    const [lgFnds, lgMoz] = await Promise.all([loadImg(logoSrc("FNDS")), loadImg(logoSrc("MozRural"))]);
+    const drawLogo = (img, x, y, h, maxW) => {
+      if (!img) return 0;
+      let w = h * img.w / img.h;
+      if (maxW && w > maxW) { w = maxW; h = w * img.h / img.w; }
+      doc.addImage(img.data, "PNG", x, y + (img.h ? 0 : 0), w, h);
+      return w;
+    };
+
+    // faixa branca com FNDS e MozRural
+    let lx = M;
+    lx += drawLogo(lgFnds, lx, 9, 14) + 6;
+    if (lgFnds && lgMoz) { doc.setDrawColor(...LINE); doc.setLineWidth(0.3); doc.line(lx - 3, 9, lx - 3, 23); }
+    drawLogo(lgMoz, lx + 1, 11, 10);
+
     doc.setFillColor(...GREEN);
-    doc.rect(0, 0, W, 118, "F");
+    doc.rect(0, 32, W, 92, "F");
     doc.setFillColor(183, 207, 110);
-    doc.rect(0, 118, W, 3, "F");
+    doc.rect(0, 124, W, 2.5, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.text(t(sigla.toUpperCase()), M, 36);
-    doc.setFontSize(24);
-    doc.text(doc.splitTextToSize(t(P.nome || sigla), CW), M, 52);
+    doc.setFontSize(10.5);
+    doc.text(t(sigla.toUpperCase()), M, 50);
+    doc.setFontSize(23);
+    doc.text(doc.splitTextToSize(t(P.nome || sigla), CW), M, 64);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(13);
-    doc.text("Relatório de Monitoria e Avaliação", M, 96);
-    doc.setFontSize(10);
-    doc.text(t((P.actualizacao ? "Dados actualizados em " + Data.fmtDate(P.actualizacao) + "  ·  " : "") + refTxt), M, 106);
+    doc.text("Relatório de Monitoria e Avaliação", M, 104);
+    doc.setFontSize(9.5);
+    doc.text(t((P.actualizacao ? "Dados actualizados em " + Data.fmtDate(P.actualizacao) + "  ·  " : "") + refTxt), M, 113);
 
     y = 136;
     const all = Data.state.indicadores.map((i) => i.codigo);
@@ -115,18 +132,18 @@
       const c = b[2] ? ST[b[2]] : { fill: GREEN_SOFT, text: GREEN, solid: GREEN };
       doc.setFillColor(...c.fill);
       doc.setDrawColor(...LINE);
-      doc.roundedRect(x, y, bw, 26, 2.5, 2.5, "FD");
+      doc.roundedRect(x, y, bw, 24, 2.5, 2.5, "FD");
       doc.setFillColor(...c.solid);
-      doc.rect(x, y + 4, 1.4, 18, "F");
+      doc.rect(x, y + 4, 1.4, 16, "F");
       doc.setTextColor(...c.text);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(18);
-      doc.text(String(b[1]), x + 5, y + 13);
+      doc.setFontSize(17);
+      doc.text(String(b[1]), x + 5, y + 12);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8.5);
-      doc.text(b[0], x + 5, y + 20);
+      doc.text(b[0], x + 5, y + 19);
     });
-    y += 38;
+    y += 32;
 
     const ficha = [
       ["Efectividade", P.efectividade], ["Período de implementação", P.periodo], ["Orçamento global", P.orcamento],
@@ -134,13 +151,33 @@
       ["Implementadores", P.implementadores], ["Relatórios anuais", P.relatorios_anuais]
     ].filter((r) => r[1]).map((r) => [t(r[0]), t(r[1])]);
     doc.autoTable({
-      startY: y, margin: { left: M, right: M }, body: ficha, theme: "plain",
-      styles: { font: "helvetica", fontSize: 9.5, textColor: INK, cellPadding: { top: 2.2, bottom: 2.2, left: 0, right: 3 }, lineColor: LINE, lineWidth: { bottom: 0.2 } },
+      startY: y, margin: { left: M, right: M, bottom: 64 }, body: ficha, theme: "plain",
+      styles: { font: "helvetica", fontSize: 9, textColor: INK, cellPadding: { top: 1.8, bottom: 1.8, left: 0, right: 3 }, lineColor: LINE, lineWidth: { bottom: 0.2 } },
       columnStyles: { 0: { cellWidth: 52, textColor: MUTED, fontStyle: "bold" } }
     });
-    doc.setFontSize(8);
+    doc.setPage(1);
+
+    // implementadores e financiador (canto inferior esquerdo)
+    const listOf = (s) => String(s || "").split(/[;,]/).map((x) => x.trim()).filter(Boolean);
+    const implImgs = await Promise.all(listOf(P.implementadores).map(async (n) => ({ n, img: await loadImg(logoSrc(n)) })));
+    const finImgs = await Promise.all(listOf(P.financiador).map(async (n) => ({ n, img: await loadImg(logoSrc(n)) })));
+    const logoRow = (label, items, y0, h) => {
+      if (!items.length) return;
+      doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(...MUTED);
+      doc.text(label.toUpperCase(), M, y0);
+      let x = M;
+      items.forEach(({ n, img }) => {
+        if (img) x += drawLogo(img, x, y0 + 2.5, h, 60) + 8;
+        else { doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(...INK); doc.text(t(n), x, y0 + 2.5 + h * 0.65); x += doc.getTextWidth(t(n)) + 8; }
+      });
+    };
+    doc.setDrawColor(...LINE); doc.setLineWidth(0.3); doc.line(M, H - 58, W - M, H - 58);
+    logoRow("Implementadores", implImgs, H - 51, 11);
+    logoRow("Financiador", finImgs, H - 31, 10);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
     doc.setTextColor(...MUTED);
-    doc.text(t("Gerado em " + new Date().toLocaleString("pt-PT")), M, H - 12);
+    doc.text(t("Gerado em " + new Date().toLocaleString("pt-PT")), W - M, H - 10, { align: "right" });
 
     // ---------- 1. Descrição ----------
     sectionBand("Secção 1", "Descrição do projecto");
@@ -151,7 +188,27 @@
     heading("Componentes", 11);
     comps.forEach((c) => para("•  " + c.nome + (c.estado === "brevemente" ? " (conteúdo disponível brevemente)" : ""), 10, INK, 0.5));
     y += 3;
-    if (P.area_implementacao) { heading("Área de implementação", 11); para(P.area_implementacao, 9, MUTED, 4); }
+    if (P.area_implementacao) {
+      heading("Área de implementação", 11);
+      para(P.area_implementacao, 9, MUTED, 4);
+      try {
+        const mp = await MapMZ.image(P.area_implementacao, 1100);
+        let mw = 105, mh = mw * mp.h / mp.w;
+        const avail = H - 22 - (y + 8);
+        if (avail >= 100 && avail < mh) { mh = avail; mw = mh * mp.w / mp.h; }
+        else if (avail < 100) { doc.addPage(); y = 20; }
+        heading("Mapa dos distritos de implementação", 11);
+        doc.addImage(mp.data, "PNG", M, y, mw, mh);
+        // legenda
+        const lx0 = M + mw + 8;
+        doc.setFillColor(46, 125, 60); doc.rect(lx0, y + 4, 4, 4, "F");
+        doc.setFillColor(230, 235, 228); doc.setDrawColor(...LINE); doc.rect(lx0, y + 11, 4, 4, "FD");
+        doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...INK);
+        doc.text(t("Distrito do projecto (" + mp.count + ")"), lx0 + 6, y + 7.2);
+        doc.text("Outros distritos", lx0 + 6, y + 14.2);
+        y += mh + 6;
+      } catch (e) { console.warn("Mapa não incluído no PDF:", e); }
+    }
 
     // ---------- 2. Indicadores programáticos ----------
     const pri = Data.doComponente("PRI");
@@ -331,6 +388,26 @@
     const stamp = new Date().toISOString().slice(0, 10);
     doc.save((sigla.replace(/\W+/g, "_") || "relatorio") + "_relatorio_ME_" + stamp + ".pdf");
     return doc;
+  }
+
+  /** Carrega uma imagem como dataURL PNG com as dimensões naturais. */
+  const imgCache = {};
+  function loadImg(src) {
+    if (!src) return Promise.resolve(null);
+    if (!imgCache[src]) {
+      imgCache[src] = new Promise((resolve) => {
+        const im = new Image();
+        im.onload = () => {
+          const c = document.createElement("canvas");
+          c.width = im.naturalWidth; c.height = im.naturalHeight;
+          c.getContext("2d").drawImage(im, 0, 0);
+          resolve({ data: c.toDataURL("image/png"), w: im.naturalWidth, h: im.naturalHeight });
+        };
+        im.onerror = () => resolve(null);
+        im.src = src;
+      });
+    }
+    return imgCache[src];
   }
 
   function tableStyle(size) {

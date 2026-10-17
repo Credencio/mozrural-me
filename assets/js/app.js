@@ -69,14 +69,29 @@
     }).join("");
 
     const impl = (P.implementadores || "").split(/[;,]/).map((s) => s.trim()).filter(Boolean);
+    const fin = (P.financiador || "").split(/[;,]/).map((s) => s.trim()).filter(Boolean);
     $("#partners").innerHTML =
-      (impl.length ? `<div class="p-label">Implementadores</div><div class="p-chips">${impl.map((s) => `<span>${esc(s)}</span>`).join("")}</div>` : "") +
-      (P.financiador ? `<div class="p-label">Financiador</div><div class="p-chips"><span>${esc(P.financiador)}</span></div>` : "");
+      (impl.length ? `<div class="p-label">Implementadores</div><div class="p-logos">${impl.map(partnerLogo).join("")}</div>` : "") +
+      (fin.length ? `<div class="p-label">Financiador</div><div class="p-logos">${fin.map(partnerLogo).join("")}</div>` : "");
 
     $("#sourceInfo").innerHTML = Data.source === "sheet"
       ? "Dados: Google Sheet ligado"
       : "Dados de exemplo (transcritos do dashboard Power BI). Configure o <code>SHEET_ID</code> em <code>config.js</code> para usar o seu Google Sheet.";
   }
+
+  /** Logótipo de um parceiro (config LOGOS); sem logótipo, mostra o nome. */
+  function logoFor(name) {
+    const L = window.APP_CONFIG.LOGOS || {};
+    const key = Object.keys(L).find((k) => k.toLowerCase() === String(name).trim().toLowerCase());
+    return key ? L[key] : null;
+  }
+  function partnerLogo(name) {
+    const src = logoFor(name);
+    return src
+      ? `<span class="logo-chip"><img src="${esc(src)}" alt="${esc(name)}" title="${esc(name)}" loading="lazy"></span>`
+      : `<span class="p-chip">${esc(name)}</span>`;
+  }
+  App.logoFor = logoFor;
 
   function setActiveNav(id) {
     document.querySelectorAll("[data-nav]").forEach((a) => {
@@ -130,6 +145,9 @@
     else body = viewResumo();
     $("#view").innerHTML = t + body;
     if (tab === "resumo") wireResumo();
+    const mapEl = $("#mzMap");
+    if (mapEl && window.MapMZ) MapMZ.render(mapEl, Data.state.projecto.area_implementacao)
+      .catch((e) => { mapEl.innerHTML = `<p class="muted small">${esc(e.message)}</p>`; });
   }
 
   function kpiStrip(codes) {
@@ -178,12 +196,15 @@
           <h3>Componentes</h3>
           <ol class="comp-list">${comps.map((c) => `<li><a href="#/c/${enc(c.id)}">${esc(c.nome)}</a>${c.estado === "brevemente" ? ' <span class="tag">em breve</span>' : ""}</li>`).join("")}</ol>
         </article>
+        <div class="desc-side">
         <aside class="card">
           <h2>Ficha do projecto</h2>
           <dl class="facts">${facts.map((f) => `<div><dt>${esc(f[0])}</dt><dd>${esc(f[1])}</dd></div>`).join("")}
             ${P.area_implementacao ? `<div><dt>Área de implementação</dt><dd>${areaHtml(P.area_implementacao)}</dd></div>` : ""}
           </dl>
         </aside>
+        ${P.area_implementacao ? `<article class="card map-card"><h2>Distritos de implementação</h2><div id="mzMap" class="mz-map-wrap"><div class="loading"><span class="spinner"></span> A carregar o mapa…</div></div></article>` : ""}
+        </div>
       </div>`;
   }
 

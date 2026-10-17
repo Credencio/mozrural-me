@@ -189,3 +189,19 @@ Os valores em `dados-exemplo/` e no modelo `.xlsx` foram transcritos do dashboar
 - **IRI 5 e IRI 5.1 em 2025:** o realizado aparecia como 0 e foi registado como "sem medição".
 - **IRI 2.4:** não existia no Power BI. A numeração foi mantida.
 - **Folha `Locais`:** está vazia. Preencha-a com coordenadas para mostrar mapas nos indicadores de infra-estruturas e beneficiários.
+
+---
+
+## 9. Logótipos e mapa de distritos
+
+**Logótipos**
+- Os ficheiros estão em `assets/img/logos/`: `fnds.png`, `mozrural.png`, `proazul.png`, `biofund.png` e `worldbank.png`.
+- Para usar versões com mais resolução, substitua os ficheiros mantendo os mesmos nomes.
+- Os implementadores e o financiador são lidos da folha **Projecto**, nos campos `implementadores` e `financiador`. O logótipo de cada um é escolhido pelo nome, na lista `LOGOS` do `config.js`.
+- Um parceiro novo sem logótipo aparece com o nome escrito.
+
+**Mapa**
+- O ficheiro `assets/geo/distritos.geojson` foi gerado a partir do shapefile `Admin_Level_2_2017`, com a geometria simplificada para a web.
+- Os distritos pintados no dashboard e no PDF vêm do campo `area_implementacao` da folha **Projecto**, no formato `PROVÍNCIA (distrito, distrito); …`.
+- Se mudar a lista nesse campo, o mapa actualiza-se sozinho.
+- Nomes que não forem encontrados no mapa aparecem indicados por baixo dele.

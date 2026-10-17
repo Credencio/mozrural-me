@@ -13,6 +13,8 @@
   --brand: #2e6b3a;
   --brand-ink: #ffffff;
   --brand-soft: #dbe9d3;
+  --map-off: #e3e9e1;
+  --map-water: #cfe3ef;
   --hero-1: #2e6b3a;
   --hero-2: #1d4a27;
   --accent: #b7cf6e;
@@ -39,7 +41,7 @@
   :root:not([data-theme="light"]) {
     --bg: #121814; --bg-deep: #0c110e; --surface: #1a221c; --surface-2: #212b23; --surface-raised: #26312a;
     --ink: #e7eee6; --ink-2: #c3cec3; --ink-3: #93a294; --line: #2e3a31; --grid: #2a352d;
-    --brand: #6fae6a; --brand-ink: #0d140f; --brand-soft: #22342a; --hero-1: #1f4a29; --hero-2: #12301a; --accent: #b7cf6e;
+    --brand: #6fae6a; --brand-ink: #0d140f; --brand-soft: #22342a; --hero-1: #1f4a29; --hero-2: #12301a; --map-off: #2c3830; --map-water: #1f3a4a; --accent: #b7cf6e;
     --c-meta: #0b764d; --c-real: #68a63f;
     --good-bg: #173a1a; --good-ink: #8fe08f; --warn-bg: #3c3010; --warn-ink: #ffd27a; --bad-bg: #3d1a1a; --bad-ink: #ff9d9d; --none-bg: #232c25;
     --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -14px rgba(0, 0, 0, .7);
@@ -49,7 +51,7 @@
 :root[data-theme="dark"] {
   --bg: #121814; --bg-deep: #0c110e; --surface: #1a221c; --surface-2: #212b23; --surface-raised: #26312a;
   --ink: #e7eee6; --ink-2: #c3cec3; --ink-3: #93a294; --line: #2e3a31; --grid: #2a352d;
-  --brand: #6fae6a; --brand-ink: #0d140f; --brand-soft: #22342a; --hero-1: #1f4a29; --hero-2: #12301a; --accent: #b7cf6e;
+  --brand: #6fae6a; --brand-ink: #0d140f; --brand-soft: #22342a; --hero-1: #1f4a29; --hero-2: #12301a; --map-off: #2c3830; --map-water: #1f3a4a; --accent: #b7cf6e;
   --c-meta: #0b764d; --c-real: #68a63f;
   --good-bg: #173a1a; --good-ink: #8fe08f; --warn-bg: #3c3010; --warn-ink: #ffd27a; --bad-bg: #3d1a1a; --bad-ink: #ff9d9d; --none-bg: #232c25;
   color-scheme: dark;
@@ -358,3 +360,31 @@ table.edit td.y { font-weight: 700; width: 90px; }
   .matrix thead th:first-child { min-width: 220px; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* ===== Logótipos ===== */
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.brand { gap: .8rem; }
+.brand-logo { display: block; height: 40px; width: auto; }
+.brand-logo.logo-moz { height: 30px; }
+.brand-sep { width: 1px; height: 34px; background: var(--line); }
+.brand-text { padding-left: .2rem; border-left: 0; }
+.brand-sub { font-size: .76rem; margin: 0; max-width: 12rem; line-height: 1.25; }
+.p-logos { display: flex; flex-wrap: wrap; gap: .45rem; margin-bottom: .7rem; align-items: center; }
+.logo-chip { display: inline-flex; align-items: center; justify-content: center; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: .35rem .55rem; height: 46px; }
+.logo-chip img { max-height: 30px; max-width: 120px; width: auto; display: block; }
+.p-chip { font-size: .8rem; font-weight: 600; padding: .25rem .55rem; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-2); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .brand-logo { background: #fff; border-radius: 8px; padding: 3px 6px; } }
+:root[data-theme="dark"] .brand-logo { background: #fff; border-radius: 8px; padding: 3px 6px; }
+
+/* ===== Mapa de distritos ===== */
+.g-desc { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: start; }
+.desc-side { display: grid; gap: 1rem; min-width: 0; }
+.map-card h2 { margin-bottom: .6rem; }
+.mz-map { width: 100%; height: auto; max-height: 640px; display: block; }
+.mz-map path { transition: opacity .12s; }
+.mz-map path:hover { opacity: .75; }
+.mz-map { overflow: visible; }
+.prov-label { font-size: .42px; font-weight: 700; fill: var(--ink); paint-order: stroke; stroke: var(--surface); stroke-width: .08px; text-anchor: middle; dominant-baseline: middle; pointer-events: none; font-family: var(--font); }
+.map-legend { display: flex; flex-wrap: wrap; gap: .4rem 1rem; font-size: .8rem; color: var(--ink-2); margin-top: .6rem; }
+.map-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: .35rem; vertical-align: -1px; border: 1px solid var(--line); }
+@media (max-width: 900px) { .g-desc { grid-template-columns: minmax(0, 1fr); } .brand-sub { display: none; } .brand-logo { height: 32px; } .brand-logo.logo-moz { height: 24px; } }
