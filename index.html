@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MozRural · Monitoria e Avaliação</title>
+  <meta name="description" content="Sistema de Monitoria e Avaliação do Programa de Economia Rural Sustentável (MozRural / PERS).">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">Saltar para o conteúdo</a>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32"><path d="M16 3c6 5 9 10 9 15a9 9 0 0 1-18 0c0-5 3-10 9-15z" fill="currentColor"/><path d="M16 9v19M16 17l-5-4M16 21l6-5" stroke="var(--surface)" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+      </span>
+      <div>
+        <div class="brand-name" id="brandName">MozRural</div>
+        <div class="brand-sub" id="brandSub">Sistema de Monitoria e Avaliação</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <label class="refyear">
+        <span>Ano de referência</span>
+        <select id="refYear" aria-label="Ano de referência"></select>
+      </label>
+      <div class="updated" id="updated" title="Data da última actualização dos dados"></div>
+      <button class="btn btn-ghost" id="btnPdf" type="button">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 19h14" /></svg>
+        <span>Exportar PDF</span>
+      </button>
+      <button class="btn btn-primary" id="btnEdit" type="button">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+        <span>Actualizar dados</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="sidenav" aria-label="Secções">
+      <ul id="navList"></ul>
+      <div class="partners" id="partners"></div>
+    </nav>
+
+    <main id="main" tabindex="-1">
+      <div id="banner"></div>
+      <div id="view" aria-live="polite">
+        <div class="loading"><span class="spinner"></span> A carregar dados…</div>
+      </div>
+    </main>
+  </div>
+
+  <footer class="foot">
+    <span id="sourceInfo"></span>
+  </footer>
+
+  <!-- Painel de actualização (bloqueado por login Google) -->
+  <div class="drawer" id="editor" hidden>
+    <div class="drawer-backdrop" data-close></div>
+    <section class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="edTitle">
+      <header class="drawer-head">
+        <div>
+          <h2 id="edTitle">Actualização de dados</h2>
+          <p class="muted" id="edUser"></p>
+        </div>
+        <div class="drawer-actions">
+          <button class="btn btn-ghost" id="edSignOut" type="button" hidden>Terminar sessão</button>
+          <button class="icon-btn" data-close aria-label="Fechar">
+            <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+      </header>
+      <div class="drawer-body" id="edBody"></div>
+    </section>
+  </div>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+
+  <!-- Bibliotecas incluídas localmente (sem dependência de CDN) -->
+  <script src="assets/vendor/papaparse.min.js"></script>
+  <script src="assets/vendor/chart.umd.js"></script>
+  <script src="assets/vendor/jspdf.umd.min.js"></script>
+  <script src="assets/vendor/jspdf.plugin.autotable.min.js"></script>
+  <link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css">
+  <script src="assets/vendor/leaflet/leaflet.js"></script>
+  <!-- Login Google (usado apenas na área "Actualizar dados") -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <script src="config.js"></script>
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/charts.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script src="assets/js/pdf.js"></script>
+  <script src="assets/js/editor.js"></script>
+</body>
+</html>

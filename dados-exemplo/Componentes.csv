@@ -1,0 +1,8 @@
+id,ordem,nome,descricao,estado
+PRI,0,Indicadores Programáticos,"Indicadores ao nível do Programa (PrDO), apresentados na página inicial.",activo
+ODP,1,ODP (Fase 1),"Indicadores do Objectivo de Desenvolvimento do Projecto, Fase 1.",activo
+C1,2,Aumento da produtividade e acesso ao mercado,"Componente 1: apoio à produtividade agrícola, tecnologias melhoradas, infra-estruturas e integração em cadeias de valor.",activo
+C2,3,Melhoria da gestão de recursos naturais,"Componente 2: infra-estruturas de gestão, licenciamento da pesca artesanal, fiscalização florestal e sistemas de informação.",activo
+C3,4,Fortalecimento institucional e políticas,"Componente 3: políticas públicas, mecanismo de diálogo e reclamações, planos de contingência e coordenação sectorial.",activo
+C4,5,CERC,Componente 4: janela de resposta a crises e emergências (CERC/CRW).,brevemente
+C5,6,Segurança Alimentar e Nutricional,Componente 5: acções para melhorar a disponibilidade e o acesso a alimentos e promover a segurança nutricional.,activo

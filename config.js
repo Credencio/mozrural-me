@@ -1,0 +1,29 @@
+/*
+ * Configuração do Sistema de M&A MozRural.
+ * Este é o único ficheiro que precisa de editar para ligar a plataforma ao seu Google Sheet.
+ * Veja o README.md para o passo-a-passo.
+ */
+window.APP_CONFIG = {
+  // ID do Google Sheet: a parte entre /d/ e /edit no link do ficheiro.
+  // Ex.: https://docs.google.com/spreadsheets/d/1AbC...xyz/edit  ->  "1AbC...xyz"
+  // Deixe vazio ("") para usar os dados de exemplo da pasta dados-exemplo/.
+  SHEET_ID: "1IvCxKnKa8sFEX3spmIRwnRDzqCExAJaivhWwOrZVVyM",
+
+  // ID de cliente OAuth (Google Cloud Console > APIs e serviços > Credenciais).
+  // Necessário apenas para a área "Actualizar dados". É público por natureza; não é um segredo.
+  CLIENT_ID: "289067560907-52bf7u46c5pq85g4lsu6pd0o6p0eupa6.apps.googleusercontent.com",
+
+  // Nomes das folhas (só altere se mudar os nomes no Google Sheet).
+  SHEETS: {
+    projecto: "Projecto",
+    componentes: "Componentes",
+    indicadores: "Indicadores",
+    dados: "Dados",
+    locais: "Locais",
+    historico: "Historico",
+    acessos: "Acessos"
+  },
+
+  // Limiares do estado de cada indicador (percentagem da meta).
+  LIMIARES: { atingido: 100, emCurso: 70 }
+};
