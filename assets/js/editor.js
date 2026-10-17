@@ -425,9 +425,9 @@
   function rowHtml(ano, meta, real, nota, isNew) {
     return `<tr data-orig='${esc(JSON.stringify({ ano, meta, real, nota: nota || "" }))}' ${isNew ? 'data-new="1"' : ""}>
       <td class="y">${isNew ? `<input type="number" data-f="ano" value="${esc(ano)}" min="1990" max="2100" aria-label="Ano">` : `<input type="hidden" data-f="ano" value="${esc(ano)}">${esc(ano)}`}</td>
-      <td><input type="text" inputmode="decimal" data-f="meta" value="${esc(meta)}" aria-label="Meta ${esc(ano)}"></td>
-      <td><input type="text" inputmode="decimal" data-f="real" value="${esc(real)}" aria-label="Realizado ${esc(ano)}"></td>
-      <td><input type="text" data-f="nota" value="${esc(nota || "")}" aria-label="Nota ${esc(ano)}"></td>
+      <td data-label="Meta"><input type="text" inputmode="decimal" data-f="meta" value="${esc(meta)}" aria-label="Meta ${esc(ano)}"></td>
+      <td data-label="Realizado"><input type="text" inputmode="decimal" data-f="real" value="${esc(real)}" aria-label="Realizado ${esc(ano)}"></td>
+      <td data-label="Nota"><input type="text" data-f="nota" value="${esc(nota || "")}" aria-label="Nota ${esc(ano)}"></td>
       <td><button type="button" class="icon-btn" data-del title="Remover este ano" aria-label="Remover ${esc(ano)}"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 11v6M14 11v6M7 7l1 12h8l1-12M9 7V4h6v3"/></svg></button></td>
     </tr>`;
   }

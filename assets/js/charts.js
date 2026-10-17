@@ -28,7 +28,7 @@
       ctx.textBaseline = "bottom";
       chart.data.datasets.forEach((ds, di) => {
         const meta = chart.getDatasetMeta(di);
-        if (meta.hidden) return;
+        if (meta.hidden || ds._noLabel) return;
         meta.data.forEach((bar, i) => {
           const v = ds.data[i];
           if (v === null || v === undefined) return;
@@ -46,13 +46,14 @@
     const unidade = ind ? ind.unidade : "";
     const labels = rows.map((r) => String(r.ano));
     const fmt = (v) => Data.fmtCompact(v) + (unidade === "%" ? "%" : "");
+    const narrow = !forPrint && window.innerWidth < 600;
     return {
       type: "bar",
       data: {
         labels,
         datasets: [
-          { label: "Meta", data: rows.map((r) => r.meta), backgroundColor: p.meta, borderRadius: 4, borderSkipped: "bottom", maxBarThickness: 46, categoryPercentage: 0.7, barPercentage: 0.92 },
-          { label: "Realizado", data: rows.map((r) => r.real), backgroundColor: p.real, borderRadius: 4, borderSkipped: "bottom", maxBarThickness: 46, categoryPercentage: 0.7, barPercentage: 0.92 }
+          { label: "Meta", data: rows.map((r) => r.meta), backgroundColor: p.meta, borderRadius: 4, borderSkipped: "bottom", maxBarThickness: narrow ? 26 : 46, categoryPercentage: 0.7, barPercentage: 0.92, _noLabel: narrow },
+          { label: "Realizado", data: rows.map((r) => r.real), backgroundColor: p.real, borderRadius: 4, borderSkipped: "bottom", maxBarThickness: narrow ? 26 : 46, categoryPercentage: 0.7, barPercentage: 0.92 }
         ]
       },
       options: {
@@ -60,7 +61,7 @@
         maintainAspectRatio: false,
         animation: forPrint ? false : { duration: 350 },
         devicePixelRatio: forPrint ? 2 : undefined,
-        layout: { padding: { top: 20 } },
+        layout: { padding: { top: 20, right: narrow ? 14 : 0 } },
         interaction: { mode: "index", intersect: false },
         plugins: {
           legend: {
@@ -79,10 +80,10 @@
               }
             }
           },
-          valueLabels: { color: p.ink, format: fmt, size: forPrint ? 13 : 11 }
+          valueLabels: { color: p.ink, format: fmt, size: forPrint ? 13 : narrow ? 10 : 11 }
         },
         scales: {
-          x: { grid: { display: false }, border: { color: p.grid }, ticks: { color: p.muted, font: { family: "'Public Sans', system-ui, sans-serif", size: forPrint ? 13 : 12 } } },
+          x: { grid: { display: false }, border: { color: p.grid }, ticks: { color: p.muted, font: { family: "'Public Sans', system-ui, sans-serif", size: forPrint ? 13 : narrow ? 10.5 : 12 } } },
           y: {
             beginAtZero: true, grace: "8%",
             grid: { color: p.grid }, border: { display: false },

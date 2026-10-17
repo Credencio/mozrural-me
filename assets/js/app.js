@@ -73,6 +73,7 @@
     $("#partners").innerHTML =
       (impl.length ? `<div class="p-label">Implementadores</div><div class="p-logos">${impl.map(partnerLogo).join("")}</div>` : "") +
       (fin.length ? `<div class="p-label">Financiador</div><div class="p-logos">${fin.map(partnerLogo).join("")}</div>` : "");
+    $("#footPartners").innerHTML = $("#partners").innerHTML;
 
     $("#sourceInfo").innerHTML = Data.source === "sheet"
       ? "Dados: Google Sheet ligado"
@@ -96,6 +97,7 @@
   function setActiveNav(id) {
     document.querySelectorAll("[data-nav]").forEach((a) => {
       const on = a.dataset.nav === id;
+      if (on) $("#navCurrent").textContent = a.querySelector(".nav-txt").textContent;
       a.classList.toggle("active", on);
       if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
     });
@@ -288,6 +290,7 @@
           <span class="lg st-bad">${ICON.bad}&lt; ${window.APP_CONFIG.LIMIARES.emCurso}% atrasado</span>
           <span class="lg st-none">${ICON.none}sem medição</span>
         </div>
+        <p class="scroll-hint">Deslize a tabela para o lado para ver todos os anos →</p>
         <div class="table-wrap">
           <table class="matrix">
             <thead><tr><th scope="col">Indicador</th>${anos.map((y) => `<th scope="col">${y}</th>`).join("")}<th scope="col">Alcance</th></tr></thead>
@@ -457,6 +460,13 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     $("#btnPdf").onclick = () => window.Report && Report.export();
+    // menu de secções no telemóvel
+    const nav = document.querySelector(".sidenav");
+    const tog = $("#navToggle");
+    const setOpen = (o) => { nav.classList.toggle("open", o); tog.setAttribute("aria-expanded", String(o)); };
+    tog.onclick = () => setOpen(!nav.classList.contains("open"));
+    $("#navList").addEventListener("click", (e) => { if (e.target.closest("a")) setOpen(false); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") setOpen(false); });
     $("#btnEdit").onclick = () => window.Editor && Editor.open();
     boot();
   });
