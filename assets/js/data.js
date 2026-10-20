@@ -187,8 +187,12 @@
       st.dados[k] = [...by.values()];
     });
     Object.values(st.dados).forEach((rows) => rows.sort((a, b) => a.ano - b.ano));
-    st.years = [...years].sort((a, b) => a - b);
     st.periodos = parsePeriodos(st.projecto.periodos || C.PERIODOS);
+    // Com períodos definidos (Ano 1 … Final), só esses aparecem na matriz, no selector e no PDF;
+    // linhas com anos antigos (ex.: 2022) de indicadores que ficaram fora do Excel são ignoradas.
+    const definidos = Object.keys(st.periodos).map(Number);
+    st.years = [...years].filter((y) => !definidos.length || definidos.includes(y)).sort((a, b) => a - b);
+    if (definidos.length) Object.keys(st.dados).forEach((k) => { st.dados[k] = st.dados[k].filter((r) => definidos.includes(r.ano)); });
 
     (raw.locais || []).forEach((r) => {
       const codigo = clean(r.codigo), lat = num(r.latitude), lng = num(r.longitude);
