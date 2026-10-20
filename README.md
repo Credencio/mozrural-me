@@ -59,7 +59,7 @@ Não mude os nomes das folhas nem os cabeçalhos da linha 1.
 | **Projecto** | Pares `chave` / `valor`: nome, objectivo, orçamento, área de implementação… A chave `actualizacao` é preenchida automaticamente. |
 | **Componentes** | Menu lateral. `id` (PRI, ODP, C1…C5), `ordem`, `nome`, `descricao`, `estado` (`activo` ou `brevemente`). |
 | **Indicadores** | Um indicador por linha. Ver as colunas na tabela seguinte. |
-| **Dados** | Uma linha por indicador e por ano: `codigo`, `ano`, `meta`, `realizado`, `nota`. |
+| **Dados** | Uma linha por indicador e por período: `codigo`, `ano` (número do período: 1 = Ano 1 … 6 = Final), `meta`, `realizado`, `nota`. |
 | **Locais** | Opcional. Pontos no mapa de um indicador: `codigo`, `nome`, `tipo`, `distrito`, `latitude`, `longitude`. |
 | **Historico** | Preenchida pela plataforma: quem alterou o quê, quando, e os valores antes e depois. |
 | **Acessos** | Preenchida pela plataforma: registo de cada entrada na área de actualização. |
@@ -71,7 +71,7 @@ Colunas da folha **Indicadores**:
 | `codigo` | Código do indicador (ex.: IRI 1.1). |
 | `componente` | `id` do componente a que pertence. |
 | `pai` | Código do indicador principal, quando a linha é uma desagregação (mulheres, jovens, províncias…). |
-| `nome`, `descricao`, `unidade`, `responsavel` | Texto apresentado no dashboard e no PDF. |
+| `nome`, `descricao`, `unidade`, `responsavel`, `tipo`, `linha_base` | Texto apresentado no dashboard e no PDF. Use a unidade `percentagem` para indicadores em %. |
 | `meta_final` | Opcional. Meta final do projecto. |
 | `agregacao` | Regra de cálculo do alcance (ver abaixo). |
 
@@ -205,3 +205,30 @@ Os valores em `dados-exemplo/` e no modelo `.xlsx` foram transcritos do dashboar
 - Os distritos pintados no dashboard e no PDF vêm do campo `area_implementacao` da folha **Projecto**, no formato `PROVÍNCIA (distrito, distrito); …`.
 - Se mudar a lista nesse campo, o mapa actualiza-se sozinho.
 - Nomes que não forem encontrados no mapa aparecem indicados por baixo dele.
+
+
+---
+
+## 10. Importar o Excel do Quadro de Resultados (RFW)
+
+A forma mais simples de manter o dashboard actualizado é importar o Excel do RFW na área **Actualizar dados → Importar Excel**.
+
+1. Entre com uma conta Editora e abra **Importar Excel**.
+2. Escolha o ficheiro `.xlsx`. A plataforma procura a folha com as colunas `Código`, `Nome do Indicador`, `Tipo`, `Baseline`, `Resultado Ano 1…5`, `Resultado final`, `Meta Ano 1…5` e `Meta final`.
+3. Reveja o resumo: indicadores novos, indicadores que deixam de existir e a lista de valores que mudam.
+4. Carregue em **Importar para o Google Sheet**. As folhas **Indicadores** e **Dados** são substituídas e tudo fica registado no **Histórico**.
+
+**Regras da conversão:**
+- **Percentagens:** podem vir como `83,61%`, `0,8361` ou `83.61`; ficam todas como 83,61.
+- **SIM/NÃO:** passam a 1/0.
+- **Células sem valor:** `-`, `NA` e células vazias ficam em branco. `To be reported` fica em branco, com a nota "A reportar".
+- **Códigos:** `IRI1.1 `, `IRI 1.1` e `IRI1.6 (emergencia)` são reconhecidos como o mesmo código. As linhas `Scorecard` passam a `SC 1…SC 6` e a linha de emergência sem código passa a `CERC 1`.
+- **Períodos:** `Resultado/Meta Ano N` corresponde ao período N; `Resultado final` e `Meta final` correspondem ao período seguinte (Final).
+
+## 11. Porque é que alguns valores não apareciam
+
+A plataforma lia o Google Sheet pelo serviço "gviz" da Google. Esse serviço decide o tipo de cada coluna e **apaga as células de texto numa coluna numérica**. Por isso, valores escritos à mão como `68,62%` ou `25,5`, que o Sheet (em formato inglês) guarda como texto, chegavam vazios.
+
+A plataforma passou a usar a exportação CSV de cada folha, que devolve as células tal como aparecem. O "gviz" só é usado se a primeira não estiver disponível. Mesmo assim, recomenda-se:
+- usar a importação do Excel (secção 10) ou o editor da plataforma, que gravam números;
+- ou mudar o Sheet para formato português, em **Ficheiro → Definições → Região: Moçambique**, para que `25,5` seja reconhecido como número.

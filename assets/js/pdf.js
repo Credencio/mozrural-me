@@ -46,7 +46,7 @@
     const CW = W - 2 * M;
     const P = Data.state.projecto;
     const sigla = P.sigla || "Projecto";
-    const refTxt = Data.refYear ? "Ano de referência: " + Data.refYear : "Ano de referência: último disponível";
+    const refTxt = Data.refYear ? "Período de referência: " + Data.periodo(Data.refYear, true) : "Período de referência: último disponível";
     let y = 0;
 
     const ensure = (h) => { if (y + h > H - 18) { doc.addPage(); y = 20; } };
@@ -217,13 +217,13 @@
       para("Alcance geral de cada indicador ao nível do Programa (PrDO).", 9.5, MUTED, 3);
       doc.autoTable({
         startY: y, margin: { left: M, right: M },
-        head: [["Código", "Indicador", "Realizado", "Meta", "Ano", "Alcance", "Estado"]],
+        head: [["Código", "Indicador", "Realizado", "Meta", "Período", "Alcance", "Estado"]],
         body: pri.map((i) => {
           const a = Data.alcance(i.codigo);
-          return [i.codigo, t(i.nome), t(Data.fmt(a.real, i.unidade)), t(Data.fmt(a.meta, i.unidade)), a.ano ?? "—", t(Data.fmtPct(a.pct)), a.status.label];
+          return [i.codigo, t(i.nome), t(Data.fmt(a.real, i.unidade)), t(Data.fmt(a.meta, i.unidade)), a.ano ? t(Data.periodo(a.ano)) : "—", t(Data.fmtPct(a.pct)), a.status.label];
         }),
         ...tableStyle(),
-        columnStyles: { 0: { cellWidth: 17, fontStyle: "bold" }, 2: { halign: "right", cellWidth: 22 }, 3: { halign: "right", cellWidth: 22 }, 4: { halign: "center", cellWidth: 12 }, 5: { halign: "right", cellWidth: 18 }, 6: { cellWidth: 20 } },
+        columnStyles: { 0: { cellWidth: 17, fontStyle: "bold" }, 2: { halign: "right", cellWidth: 22 }, 3: { halign: "right", cellWidth: 22 }, 4: { halign: "center", cellWidth: 17 }, 5: { halign: "right", cellWidth: 18 }, 6: { cellWidth: 20 } },
         didParseCell: (d) => {
           if (d.section === "body" && (d.column.index === 5 || d.column.index === 6)) {
             const a = Data.alcance(pri[d.row.index].codigo);
@@ -238,7 +238,7 @@
 
     // ---------- 3. Matriz ----------
     sectionBand("Secção 3", "Matriz do progresso anual dos indicadores");
-    para("Realizado em percentagem da meta de cada ano. Verde: atingido (>= " + window.APP_CONFIG.LIMIARES.atingido + "%); amarelo: em curso (" + window.APP_CONFIG.LIMIARES.emCurso + "-" + window.APP_CONFIG.LIMIARES.atingido + "%); vermelho: atrasado (< " + window.APP_CONFIG.LIMIARES.emCurso + "%); vazio: sem medição.", 9, MUTED, 3);
+    para("Realizado em percentagem da meta de cada período. Verde: atingido (>= " + window.APP_CONFIG.LIMIARES.atingido + "%); amarelo: em curso (" + window.APP_CONFIG.LIMIARES.emCurso + "-" + window.APP_CONFIG.LIMIARES.atingido + "%); vermelho: atrasado (< " + window.APP_CONFIG.LIMIARES.emCurso + "%); vazio: sem medição.", 9, MUTED, 3);
     const anos = Data.anos();
     const mRows = [];
     const mMeta = [];
@@ -255,7 +255,7 @@
     });
     doc.autoTable({
       startY: y, margin: { left: M, right: M },
-      head: [["Indicador"].concat(anos.map(String)).concat(["Alcance"])],
+      head: [["Indicador"].concat(anos.map((y) => t(Data.periodo(y)))).concat(["Alcance"])],
       body: mRows,
       ...tableStyle(7.5),
       columnStyles: Object.fromEntries([[0, { cellWidth: CW - (anos.length + 1) * 15 }]].concat(anos.map((_, k) => [k + 1, { halign: "center", cellWidth: 15 }])).concat([[anos.length + 1, { halign: "center", cellWidth: 15, fontStyle: "bold" }]])),
@@ -339,9 +339,10 @@
       y += tl.length * 5 + 1;
       para(ind.descricao, 9, MUTED, 1.5);
       const info = [
-        "Realizado: " + Data.fmt(a.real, ind.unidade) + (a.ano ? " (" + a.ano + ")" : ""),
+        "Realizado: " + Data.fmt(a.real, ind.unidade) + (a.ano ? " (" + Data.periodo(a.ano) + ")" : ""),
         "Meta: " + Data.fmt(a.meta, ind.unidade),
         a.pctFinal !== null ? "Meta final: " + Data.fmt(ind.metaFinal, ind.unidade) + " (" + Data.fmtPct(a.pctFinal) + ")" : "",
+        ind.linhaBase !== null && ind.linhaBase !== undefined ? "Linha de base: " + Data.fmt(ind.linhaBase, ind.linhaBase > 100 ? "" : ind.unidade) : "",
         ind.responsavel ? "Responsável: " + ind.responsavel : ""
       ].filter(Boolean).join("   ·   ");
       para(info, 8.5, INK, 3);
@@ -358,10 +359,10 @@
       // tabela
       doc.autoTable({
         startY: y, margin: { left: M, right: M },
-        head: [["Ano", "Meta", "Realizado", "% da meta", "Nota"]],
-        body: rows.map((r) => [r.ano, t(Data.fmt(r.meta, ind.unidade)), t(Data.fmt(r.real, ind.unidade)), t(Data.fmtPct(Data.pctAno(ind.codigo, r.ano))), t(r.nota || "")]),
+        head: [["Período", "Meta", "Realizado", "% da meta", "Nota"]],
+        body: rows.map((r) => [t(Data.periodo(r.ano, true)), t(Data.fmt(r.meta, ind.unidade)), t(Data.fmt(r.real, ind.unidade)), t(Data.fmtPct(Data.pctAno(ind.codigo, r.ano))), t(r.nota || "")]),
         ...tableStyle(8),
-        columnStyles: { 0: { cellWidth: 14, fontStyle: "bold" }, 1: { halign: "right", cellWidth: 26 }, 2: { halign: "right", cellWidth: 26 }, 3: { halign: "right", cellWidth: 22 } },
+        columnStyles: { 0: { cellWidth: 40, fontStyle: "bold" }, 1: { halign: "right", cellWidth: 26 }, 2: { halign: "right", cellWidth: 26 }, 3: { halign: "right", cellWidth: 22 } },
         didParseCell: (d) => {
           if (d.section === "body" && d.column.index === 3) {
             const p = Data.pctAno(ind.codigo, rows[d.row.index].ano);

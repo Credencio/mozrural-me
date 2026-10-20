@@ -341,6 +341,19 @@ table.edit td.y { font-weight: 700; width: 90px; }
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 
+/* ===== Importação ===== */
+.imp-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5rem; margin: 1rem 0 .8rem; }
+.imp-summary > div { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: .6rem .7rem; display: flex; flex-direction: column; }
+.imp-summary strong { font-family: var(--display); font-size: 1.4rem; line-height: 1.1; }
+.imp-summary span { font-size: .74rem; color: var(--ink-3); }
+.imp-extra { background: var(--warn-bg); color: var(--warn-ink); border-radius: 10px; padding: .6rem .8rem; margin: .6rem 0; }
+.imp-extra p { margin: 0 0 .3rem; }
+.imp-diffs { margin: .8rem 0; }
+.imp-diffs summary { cursor: pointer; color: var(--brand); font-weight: 600; font-size: .88rem; }
+.imp-diffs .table-wrap { max-height: 320px; margin-top: .5rem; }
+input[type="file"] { font: inherit; font-size: .9rem; padding: .5rem; border: 1px dashed var(--line); border-radius: 10px; background: var(--surface-2); width: 100%; }
+@media (max-width: 600px) { .imp-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
 /* ===== Logótipos ===== */
 .visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .brand { gap: .8rem; }
@@ -386,7 +399,11 @@ table.edit td.y { font-weight: 700; width: 90px; }
   .topbar-actions { grid-area: actions; gap: .4rem; }
   .topbar-meta { grid-area: meta; margin: 0; justify-content: space-between; gap: .6rem; }
   .refyear { flex-direction: row; align-items: center; gap: .45rem; }
-  .refyear select { padding: .35rem .45rem; }
+  .refyear { min-width: 0; flex: 1 1 auto; }
+  .refyear select { padding: .35rem .45rem; max-width: 100%; min-width: 0; width: 100%; text-overflow: ellipsis; }
+  .topbar-meta { min-width: 0; }
+  .updated { flex: none; font-size: .64rem; }
+  .updated strong { font-size: .8rem; }
   .updated { display: flex; border-left: 0; padding: 0; text-align: right; }
   .topbar-actions .btn span { display: none; }
   .topbar-actions .btn { padding: 0; width: 44px; height: 44px; justify-content: center; border-radius: 12px; }
@@ -473,7 +490,7 @@ table.edit td.y { font-weight: 700; width: 90px; }
   table.edit .icon-btn { width: 44px; height: 44px; }
   .hist { font-size: .74rem; }
 }
+@media (max-width: 420px) { .refyear span { display: none; } }
 @media (max-width: 360px) {
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .refyear span { display: none; }
 }

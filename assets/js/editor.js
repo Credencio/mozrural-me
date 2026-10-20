@@ -16,7 +16,8 @@
 
   const HEAD = {
     projecto: ["chave", "valor"],
-    indicadores: ["codigo", "componente", "pai", "nome", "descricao", "unidade", "meta_final", "agregacao", "responsavel"],
+    indicadores: ["codigo", "componente", "pai", "nome", "descricao", "unidade", "meta_final", "agregacao", "responsavel", "tipo", "linha_base"],
+    componentes: ["id", "ordem", "nome", "descricao", "estado"],
     dados: ["codigo", "ano", "meta", "realizado", "nota"],
     historico: ["data", "utilizador", "folha", "registo", "campo", "valor_anterior", "valor_novo"],
     acessos: ["data", "utilizador", "accao"]
@@ -66,6 +67,18 @@
       }
       throw e;
     }
+  }
+
+  /** Substitui todo o conteúdo de uma folha (limpa e escreve a partir de A1). */
+  async function replaceSheet(sheetKey, values) {
+    const r = encodeURIComponent(q(S[sheetKey]));
+    try { await api("/values/" + r + ":clear", { method: "POST", body: {} }); }
+    catch (e) {
+      if (e.status === 400 && /parse range|Unable to parse/i.test(e.message)) {
+        await api(":batchUpdate", { method: "POST", body: { requests: [{ addSheet: { properties: { title: S[sheetKey] } } }] } });
+      } else throw e;
+    }
+    await api("/values/" + encodeURIComponent(q(S[sheetKey]) + "!A1") + "?valueInputOption=RAW", { method: "PUT", body: { values } });
   }
 
   async function batchUpdate(data) {
@@ -119,12 +132,12 @@
       const col = (h) => H.indexOf(h);
       const updates = [], appends = [], hist = [];
       edits.forEach((e) => {
-        const ex = cur.objs.find((o) => String(o.codigo).trim() === codigo && Number(o.ano) === Number(e.ano));
+        const ex = cur.objs.find((o) => Data.canon(o.codigo) === Data.canon(codigo) && Number(Data.num(o.ano)) === Number(e.ano));
         const row = H.map((h) => ({ codigo, ano: Number(e.ano), meta: e.meta ?? "", realizado: e.real ?? "", nota: e.nota || "" }[h] ?? (ex ? ex[h] : "")));
         if (e.remove) {
           if (ex) {
             updates.push({ range: q(S.dados) + "!A" + ex._row, values: [H.map(() => "")] });
-            hist.push([nowIso(), st.email, S.dados, codigo + " " + e.ano, "linha", [ex.meta, ex.realizado].join(" / "), "(removida)"]);
+            hist.push([nowIso(), st.email, S.dados, codigo + " " + Data.periodo(e.ano), "linha", [ex.meta, ex.realizado].join(" / "), "(removida)"]);
           }
           return;
         }
@@ -132,11 +145,11 @@
           updates.push({ range: q(S.dados) + "!A" + ex._row, values: [row] });
           [["meta", "meta"], ["realizado", "realizado"], ["nota", "nota"]].forEach(([h]) => {
             const nv = row[col(h)], ov = ex[h];
-            if (String(nv) !== String(ov)) hist.push([nowIso(), st.email, S.dados, codigo + " " + e.ano, h, String(ov ?? ""), String(nv ?? "")]);
+            if (String(nv) !== String(ov)) hist.push([nowIso(), st.email, S.dados, codigo + " " + Data.periodo(e.ano), h, String(ov ?? ""), String(nv ?? "")]);
           });
         } else {
           appends.push(row);
-          hist.push([nowIso(), st.email, S.dados, codigo + " " + e.ano, "linha", "", "meta " + (e.meta ?? "") + " / realizado " + (e.real ?? "")]);
+          hist.push([nowIso(), st.email, S.dados, codigo + " " + Data.periodo(e.ano), "linha", "", "meta " + (e.meta ?? "") + " / realizado " + (e.real ?? "")]);
         }
       });
       await batchUpdate(updates);
@@ -147,7 +160,12 @@
     async saveIndicador(form, isNew) {
       const cur = (await readSheets(["indicadores"])).indicadores;
       const H = cur.head.length ? cur.head : HEAD.indicadores;
-      const ex = cur.objs.find((o) => String(o.codigo).trim() === form.codigo);
+      const ex = cur.objs.find((o) => Data.canon(o.codigo) === Data.canon(form.codigo));
+      const missing = HEAD.indicadores.filter((h) => !cur.head.includes(h));
+      if (cur.head.length && missing.length) { // acrescentar colunas novas (ex.: tipo, linha_base)
+        cur.head = cur.head.concat(missing);
+        await batchUpdate([{ range: q(S.indicadores) + "!A1", values: [cur.head] }]);
+      }
       if (isNew && ex) throw new Error("Já existe um indicador com o código " + form.codigo + ".");
       const row = H.map((h) => (h in form ? form[h] : ex ? ex[h] : ""));
       const hist = [];
@@ -161,9 +179,9 @@
       await touch(hist);
     },
 
-    async saveProjecto(pairs) {
+    async saveProjecto(pairs, extraHist) {
       const cur = (await readSheets(["projecto"])).projecto;
-      const updates = [], appends = [], hist = [];
+      const updates = [], appends = [], hist = extraHist || [];
       Object.entries(pairs).forEach(([k, v]) => {
         const ex = cur.objs.find((o) => String(o.chave).trim() === k);
         if (ex) {
@@ -184,8 +202,24 @@
     async historico() {
       const r = (await readSheets(["historico"])).historico;
       return r ? r.objs.slice(-150).reverse() : [];
+    },
+
+    async importRFW(plan) {
+      await replaceSheet("indicadores", [HEAD.indicadores].concat(plan.indRows));
+      await replaceSheet("dados", [HEAD.dados].concat(plan.dadosRows));
+      if (plan.compsChanged) await replaceSheet("componentes", [HEAD.componentes].concat(plan.compRows));
+      await google.saveProjecto({ periodos: plan.res.periodosTxt }, importHist(plan));
     }
   };
+
+  /** Linhas de histórico de uma importação: resumo + cada valor alterado (até 500). */
+  function importHist(plan) {
+    const who = st.demo ? "demonstração" : st.email;
+    const h = [[nowIso(), who, "Importação Excel", plan.fileName || "", "resumo", "",
+      plan.res.indicadores.length + " indicadores, " + plan.res.dados.length + " linhas de dados, " + plan.diffs.length + " valores alterados"]];
+    plan.diffs.slice(0, 500).forEach((d) => h.push([nowIso(), who, S.dados, d[0] + " " + Data.periodo(d[1]), d[2], d[3] === null ? "" : String(d[3]), d[4] === null ? "" : String(d[4])]));
+    return h;
+  }
 
   /** Regista o histórico e actualiza a data de actualização do projecto. */
   async function touch(hist) {
@@ -203,18 +237,18 @@
     async saveDados(codigo, edits) {
       const raw = clone(Data.raw);
       edits.forEach((e) => {
-        const i = raw.dados.findIndex((r) => String(r.codigo).trim() === codigo && Number(r.ano) === Number(e.ano));
+        const i = raw.dados.findIndex((r) => Data.canon(r.codigo) === Data.canon(codigo) && Number(Data.num(r.ano)) === Number(e.ano));
         if (e.remove) { if (i >= 0) raw.dados.splice(i, 1); return; }
         const row = { codigo, ano: e.ano, meta: e.meta ?? "", realizado: e.real ?? "", nota: e.nota || "" };
         if (i >= 0) raw.dados[i] = row; else raw.dados.push(row);
-        demoHist.unshift({ data: nowIso(), utilizador: "demonstração", folha: "Dados", registo: codigo + " " + e.ano, campo: "meta/realizado", valor_anterior: "", valor_novo: (e.meta ?? "") + " / " + (e.real ?? "") });
+        demoHist.unshift({ data: nowIso(), utilizador: "demonstração", folha: "Dados", registo: codigo + " " + Data.periodo(e.ano), campo: "meta/realizado", valor_anterior: "", valor_novo: (e.meta ?? "") + " / " + (e.real ?? "") });
       });
       setProj(raw, "actualizacao", today());
       Data.setRaw(raw, "exemplo"); App.refresh();
     },
     async saveIndicador(form) {
       const raw = clone(Data.raw);
-      const i = raw.indicadores.findIndex((r) => String(r.codigo).trim() === form.codigo);
+      const i = raw.indicadores.findIndex((r) => Data.canon(r.codigo) === Data.canon(form.codigo));
       if (i >= 0) raw.indicadores[i] = Object.assign({}, raw.indicadores[i], form); else raw.indicadores.push(form);
       demoHist.unshift({ data: nowIso(), utilizador: "demonstração", folha: "Indicadores", registo: form.codigo, campo: "metadados", valor_anterior: "", valor_novo: "" });
       setProj(raw, "actualizacao", today());
@@ -226,7 +260,18 @@
       setProj(raw, "actualizacao", today());
       Data.setRaw(raw, "exemplo"); App.refresh();
     },
-    async historico() { return demoHist; }
+    async historico() { return demoHist; },
+    async importRFW(plan) {
+      const raw = clone(Data.raw);
+      const toObj = (head, rows) => rows.map((r) => Object.fromEntries(head.map((h, i) => [h, r[i]])));
+      raw.indicadores = toObj(HEAD.indicadores, plan.indRows);
+      raw.dados = toObj(HEAD.dados, plan.dadosRows);
+      if (plan.compsChanged) raw.componentes = toObj(HEAD.componentes, plan.compRows);
+      setProj(raw, "periodos", plan.res.periodosTxt);
+      setProj(raw, "actualizacao", today());
+      importHist(plan).forEach((r) => demoHist.unshift({ data: r[0], utilizador: r[1], folha: r[2], registo: r[3], campo: r[4], valor_anterior: r[5], valor_novo: r[6] }));
+      Data.setRaw(raw, "exemplo"); App.refresh();
+    }
   };
   const clone = (o) => JSON.parse(JSON.stringify(o));
   function setProj(raw, k, v) {
@@ -371,12 +416,12 @@
     $("#edUser").innerHTML = st.demo
       ? '<span class="pill st-warn">Modo demonstração: nada é gravado</span>'
       : "Sessão: <strong>" + esc(st.email) + "</strong> · com permissão de edição";
-    const tabsDef = [["dados", "Dados anuais"], ["indicadores", "Indicadores"], ["projecto", "Projecto"], ["historico", "Histórico"]];
+    const tabsDef = [["dados", "Dados por período"], ["importar", "Importar Excel"], ["indicadores", "Indicadores"], ["projecto", "Projecto"], ["historico", "Histórico"]];
     $("#edBody").innerHTML = `
       <div class="tabs ed-tabs" role="tablist">${tabsDef.map(([id, l]) => `<button type="button" role="tab" class="tab${st.tab === id ? " active" : ""}" aria-selected="${st.tab === id}" data-tab="${id}">${l}</button>`).join("")}</div>
       <div id="edPane"></div>`;
     $("#edBody").querySelectorAll("[data-tab]").forEach((b) => { b.onclick = () => { st.tab = b.dataset.tab; renderEditor(); }; });
-    ({ dados: paneDados, indicadores: paneIndicadores, projecto: paneProjecto, historico: paneHistorico })[st.tab]();
+    ({ dados: paneDados, importar: paneImportar, indicadores: paneIndicadores, projecto: paneProjecto, historico: paneHistorico })[st.tab]();
   }
 
   function indicatorSelect(id, selected) {
@@ -397,14 +442,14 @@
     $("#edPane").innerHTML = `
       <div class="card">
         <div class="form-row"><label for="edInd">Indicador</label>${indicatorSelect("edInd", st.codigo)}</div>
-        <p class="muted small">${esc(ind ? ind.nome : "")}${ind && ind.unidade ? " · unidade: <strong>" + esc(ind.unidade) + "</strong>" : ""}. Deixe <em>Realizado</em> vazio quando ainda não houver medição (0 significa zero).</p>
+        <p class="muted small">${esc(ind ? ind.nome : "")}${ind && ind.unidade ? " · unidade: <strong>" + (ind.pct ? "%" : esc(ind.unidade)) + "</strong>" : ""}. Deixe <em>Realizado</em> vazio quando ainda não houver medição (0 significa zero).${ind && ind.pct ? " Percentagens: escreva <strong>83,61</strong>, <strong>83,61%</strong> ou <strong>0,8361</strong>." : ""}</p>
         <div class="table-wrap">
           <table class="edit" id="edTable">
-            <thead><tr><th>Ano</th><th>Meta</th><th>Realizado</th><th>Nota</th><th></th></tr></thead>
+            <thead><tr><th>Período</th><th>Meta</th><th>Realizado</th><th>Nota</th><th></th></tr></thead>
             <tbody>${rows.map((r) => rowHtml(r.ano, v(r.meta), v(r.real), r.nota, false)).join("")}</tbody>
           </table>
         </div>
-        <p><button class="btn btn-ghost btn-sm" id="edAddYear" type="button">+ Adicionar ano</button></p>
+        <p><button class="btn btn-ghost btn-sm" id="edAddYear" type="button">+ Adicionar período</button></p>
         <div class="savebar">
           <span class="muted small" id="edDirty">Sem alterações.</span>
           <button class="btn btn-primary" id="edSave" type="button" disabled>Gravar no Google Sheet</button>
@@ -413,7 +458,8 @@
     $("#edInd").onchange = (e) => { if (confirmDiscard()) { st.codigo = e.target.value; paneDados(); } else e.target.value = st.codigo; };
     $("#edAddYear").onclick = () => {
       const ys = [...$("#edTable").querySelectorAll("[data-f=ano]")].map((i) => Number(i.value)).filter(Boolean);
-      const next = ys.length ? Math.max(...ys) + 1 : new Date().getFullYear();
+      const known = Object.keys(Data.state.periodos).map(Number);
+      const next = ys.length ? Math.max(...ys) + 1 : (known.length ? Math.min(...known) : new Date().getFullYear());
       $("#edTable tbody").insertAdjacentHTML("beforeend", rowHtml(next, "", "", "", true));
       wireRows();
       markDirty();
@@ -424,16 +470,24 @@
 
   function rowHtml(ano, meta, real, nota, isNew) {
     return `<tr data-orig='${esc(JSON.stringify({ ano, meta, real, nota: nota || "" }))}' ${isNew ? 'data-new="1"' : ""}>
-      <td class="y">${isNew ? `<input type="number" data-f="ano" value="${esc(ano)}" min="1990" max="2100" aria-label="Ano">` : `<input type="hidden" data-f="ano" value="${esc(ano)}">${esc(ano)}`}</td>
-      <td data-label="Meta"><input type="text" inputmode="decimal" data-f="meta" value="${esc(meta)}" aria-label="Meta ${esc(ano)}"></td>
-      <td data-label="Realizado"><input type="text" inputmode="decimal" data-f="real" value="${esc(real)}" aria-label="Realizado ${esc(ano)}"></td>
-      <td data-label="Nota"><input type="text" data-f="nota" value="${esc(nota || "")}" aria-label="Nota ${esc(ano)}"></td>
-      <td><button type="button" class="icon-btn" data-del title="Remover este ano" aria-label="Remover ${esc(ano)}"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 11v6M14 11v6M7 7l1 12h8l1-12M9 7V4h6v3"/></svg></button></td>
+      <td class="y">${isNew
+        ? `<input type="number" data-f="ano" value="${esc(ano)}" min="1" max="2100" aria-label="Número do período" title="Número do período"> <span class="muted small" data-plabel>${esc(Data.periodo(ano))}</span>`
+        : `<input type="hidden" data-f="ano" value="${esc(ano)}"><span title="${esc(Data.periodo(ano, true))}">${esc(Data.periodo(ano))}</span>`}</td>
+      <td data-label="Meta"><input type="text" inputmode="decimal" data-f="meta" value="${esc(meta)}" aria-label="Meta ${esc(Data.periodo(ano))}"></td>
+      <td data-label="Realizado"><input type="text" inputmode="decimal" data-f="real" value="${esc(real)}" aria-label="Realizado ${esc(Data.periodo(ano))}"></td>
+      <td data-label="Nota"><input type="text" data-f="nota" value="${esc(nota || "")}" aria-label="Nota ${esc(Data.periodo(ano))}"></td>
+      <td><button type="button" class="icon-btn" data-del title="Remover este período" aria-label="Remover ${esc(Data.periodo(ano))}"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 11v6M14 11v6M7 7l1 12h8l1-12M9 7V4h6v3"/></svg></button></td>
     </tr>`;
   }
 
   function wireRows() {
-    $("#edTable").querySelectorAll("input").forEach((inp) => { inp.oninput = markDirty; });
+    $("#edTable").querySelectorAll("input").forEach((inp) => {
+      inp.oninput = () => {
+        const lab = inp.dataset.f === "ano" && inp.parentElement.querySelector("[data-plabel]");
+        if (lab) lab.textContent = Data.periodo(Number(inp.value));
+        markDirty();
+      };
+    });
     $("#edTable").querySelectorAll("[data-del]").forEach((b) => {
       b.onclick = () => {
         const tr = b.closest("tr");
@@ -455,15 +509,15 @@
         const inp = tr.querySelector(`[data-f=${f}]`);
         const changed = String(cur[f]) !== String(o[f]);
         inp.classList.toggle("changed", changed);
-        if (cur[f] !== "" && Data.num(cur[f]) === null) invalid = "Valor inválido em " + cur.ano + " (" + (f === "real" ? "realizado" : "meta") + ").";
+        if (cur[f] !== "" && Data.num(cur[f]) === null) invalid = "Valor inválido em " + Data.periodo(cur.ano) + " (" + (f === "real" ? "realizado" : "meta") + ").";
       });
       tr.querySelector("[data-f=nota]").classList.toggle("changed", cur.nota !== o.nota);
-      if (!cur.ano || cur.ano < 1990 || cur.ano > 2100) invalid = "Ano inválido.";
+      if (!cur.ano || cur.ano < 1 || cur.ano > 2100) invalid = "Número de período inválido.";
       const isChanged = tr.dataset.new || tr.dataset.remove || String(cur.meta) !== String(o.meta) || String(cur.real) !== String(o.real) || cur.nota !== o.nota;
       if (isChanged) edits.push({ ano: cur.ano, meta: Data.num(cur.meta), real: Data.num(cur.real), nota: cur.nota, remove: !!tr.dataset.remove });
     });
     const anos = [...$("#edTable").querySelectorAll("tbody tr:not([data-remove='1']) [data-f=ano]")].map((i) => i.value);
-    if (new Set(anos).size !== anos.length) invalid = "Há anos repetidos.";
+    if (new Set(anos).size !== anos.length) invalid = "Há períodos repetidos.";
     return { edits, invalid };
   }
 
@@ -505,11 +559,153 @@
     guarded($("#edSave"), () => backend().saveDados(st.codigo, edits), "Dados gravados no Google Sheet.");
   }
 
+  // ---------- Importar Excel do Quadro de Resultados (RFW) ----------
+  let importPlan = null;
+
+  function loadXlsx() {
+    if (window.XLSX) return Promise.resolve(window.XLSX);
+    return new Promise((resolve, reject) => {
+      const sc = document.createElement("script");
+      sc.src = "assets/vendor/xlsx.mini.min.js";
+      sc.onload = () => resolve(window.XLSX);
+      sc.onerror = () => reject(new Error("Não foi possível carregar o leitor de Excel."));
+      document.head.appendChild(sc);
+    });
+  }
+
+  function similar(a, b) {
+    const w = (x) => new Set(String(x || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length > 3));
+    const A = w(a), B = w(b);
+    if (!A.size || !B.size) return false;
+    let n = 0; A.forEach((t) => { if (B.has(t)) n++; });
+    return n / Math.min(A.size, B.size) >= 0.5;
+  }
+
+  /** Compara o Excel com os dados actuais e prepara as linhas a gravar. */
+  function buildPlan(res, keepExtra, fileName) {
+    const cur = Data.state.indicadores;
+    const curBy = {};
+    cur.forEach((i) => { curBy[Data.canon(i.codigo)] = i; });
+    const inExcel = new Set(res.indicadores.map((i) => Data.canon(i.codigo)));
+    const inds = res.indicadores.map((x) => {
+      const ex = curBy[Data.canon(x.codigo)];
+      const o = Object.assign({}, x);
+      // manter descrição/responsável/regra já escritos, se for o mesmo indicador
+      if (ex && !!ex.pai === !!x.pai && similar(ex.nome, x.nome)) {
+        o.descricao = ex.descricao || x.descricao;
+        o.responsavel = ex.responsavel || x.responsavel;
+        o.agregacao = ex.agregacao || x.agregacao;
+        if (x.unidade !== "percentagem" && ex.unidade && !Data.isPctUnit(ex.unidade)) o.unidade = ex.unidade;
+      }
+      return o;
+    });
+    const extras = cur.filter((i) => !inExcel.has(Data.canon(i.codigo)));
+    const indRows = inds.map((o) => HEAD.indicadores.map((h) => (o[h] === undefined || o[h] === null ? "" : o[h])));
+    const dadosRows = res.dados.map((d) => HEAD.dados.map((h) => (d[h] === undefined || d[h] === null ? "" : d[h])));
+    if (keepExtra) {
+      extras.forEach((i) => {
+        const o = { codigo: i.codigo, componente: i.componente, pai: i.pai, nome: i.nome, descricao: i.descricao, unidade: i.unidade, meta_final: i.metaFinal ?? "", agregacao: i.agregacao, responsavel: i.responsavel, tipo: i.tipo || "", linha_base: i.linhaBase ?? "" };
+        indRows.push(HEAD.indicadores.map((h) => o[h] ?? ""));
+        (Data.state.dados[i.codigo] || []).forEach((r) => dadosRows.push([i.codigo, r.ano, r.meta ?? "", r.real ?? "", r.nota || ""]));
+      });
+    }
+    // valores alterados (comparando com o que está agora no dashboard)
+    const diffs = [];
+    res.dados.forEach((d) => {
+      const ind = curBy[Data.canon(d.codigo)];
+      const old = ind ? (Data.state.dados[ind.codigo] || []).find((r) => r.ano === d.ano) : null;
+      [["meta", "meta"], ["realizado", "real"]].forEach(([f, k]) => {
+        const nv = d[f] === "" ? null : d[f];
+        const ov = old ? old[k] : null;
+        const same = (nv === null && ov === null) || (nv !== null && ov !== null && Math.abs(nv - ov) < 1e-6);
+        if (!same) diffs.push([d.codigo, d.ano, f, ov, nv]);
+      });
+    });
+    // componentes necessários (ex.: Scorecard novo, CERC passa a activo)
+    const comps = Data.state.componentes.map((c) => ({ id: c.id, ordem: c.ordem, nome: c.nome, descricao: c.descricao, estado: c.estado }));
+    const compsMudados = [];
+    res.comps.forEach((id) => {
+      let c = comps.find((x) => x.id === id);
+      if (!c) {
+        const nm = (RFW.COMP_NOMES[id] || [id, ""]);
+        c = { id, ordem: Math.max(0, ...comps.map((x) => Number(x.ordem) || 0)) + 1, nome: nm[0], descricao: nm[1], estado: "activo" };
+        comps.push(c); compsMudados.push(c.nome + " (novo)");
+      } else if (c.estado !== "activo") { c.estado = "activo"; compsMudados.push(c.nome); }
+    });
+    const compsChanged = compsMudados.length > 0;
+    const compRows = comps.map((c) => HEAD.componentes.map((h) => c[h] ?? ""));
+    return { res, inds, indRows, dadosRows, extras, diffs, compsChanged, compsMudados, compRows, comps, fileName,
+      novos: res.indicadores.filter((x) => !curBy[Data.canon(x.codigo)]).map((x) => x.codigo) };
+  }
+
+  function paneImportar() {
+    $("#edPane").innerHTML = `
+      <div class="card">
+        <h3>Importar o Excel do Quadro de Resultados</h3>
+        <p class="muted small">Carregue o ficheiro <strong>.xlsx</strong> com as colunas <em>Código, Nome do Indicador, Tipo, Baseline,
+          Resultado Ano 1…5, Resultado final, Meta Ano 1…5, Meta final</em> (o formato do RFW). A plataforma lê as metas e os resultados
+          de todos os indicadores e mostra-lhe o que vai mudar antes de gravar.</p>
+        <p class="muted small">Percentagens podem vir como <code>83,61%</code>, <code>0,8361</code> ou <code>83.61</code>; <code>SIM</code>/<code>NÃO</code> passam a 1/0;
+          <code>-</code>, <code>NA</code> e <code>To be reported</code> ficam em branco.</p>
+        <div class="form-row"><label for="impFile">Ficheiro Excel</label><input type="file" id="impFile" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>
+        <div id="impOut"></div>
+      </div>`;
+    $("#impFile").onchange = async (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      $("#impOut").innerHTML = `<div class="loading"><span class="spinner"></span> A ler ${esc(f.name)}…</div>`;
+      try {
+        const XLSX = await loadXlsx();
+        const wb = XLSX.read(await f.arrayBuffer(), { type: "array" });
+        const res = RFW.parseWorkbook(XLSX, wb);
+        importPlan = buildPlan(res, false, f.name);
+        renderImportPreview();
+      } catch (err) {
+        console.error(err);
+        $("#impOut").innerHTML = `<p class="pill st-bad" role="alert">${esc(err.message)}</p>`;
+      }
+    };
+  }
+
+  function renderImportPreview() {
+    const p = importPlan, r = p.res;
+    const fmtV = (v) => (v === null || v === undefined ? "—" : Data.fmt(v));
+    $("#impOut").innerHTML = `
+      <div class="imp-summary">
+        <div><strong>${r.indicadores.length}</strong><span>indicadores</span></div>
+        <div><strong>${r.dados.length}</strong><span>linhas de dados</span></div>
+        <div><strong>${p.diffs.length}</strong><span>valores mudam</span></div>
+        <div><strong>${p.novos.length}</strong><span>indicadores novos</span></div>
+      </div>
+      <p class="small"><strong>Folha lida:</strong> ${esc(r.sheet)} · <strong>Períodos:</strong> ${r.periodos.map((x) => esc(x.label)).join(" · ")}</p>
+      ${p.novos.length ? `<p class="small"><strong>Novos:</strong> ${p.novos.map(esc).join(", ")}</p>` : ""}
+      ${p.compsChanged ? `<p class="small"><strong>Menu:</strong> ${p.compsMudados.map(esc).join(", ")} passa(m) a aparecer com indicadores.</p>` : ""}
+      ${p.extras.length ? `<div class="imp-extra"><p class="small"><strong>Não estão no Excel:</strong> ${p.extras.map((i) => esc(i.codigo)).join(", ")}.
+          Por defeito são retirados do dashboard.</p>
+          <label class="small"><input type="checkbox" id="impKeep"> Manter estes indicadores e os seus dados</label></div>` : ""}
+      ${r.avisos.length ? `<ul class="notes">${r.avisos.map((a) => `<li>${esc(a)}</li>`).join("")}</ul>` : ""}
+      ${p.diffs.length ? `<details class="imp-diffs"><summary>Ver os valores que mudam (${p.diffs.length})</summary>
+        <div class="table-wrap"><table class="data hist"><thead><tr><th>Indicador</th><th>Período</th><th>Campo</th><th>Agora</th><th>Excel</th></tr></thead>
+        <tbody>${p.diffs.slice(0, 400).map((d) => `<tr><td>${esc(d[0])}</td><td>${esc(Data.state.periodos[d[1]] ? Data.periodo(d[1]) : (r.periodos.find((x) => x.p === d[1]) || {}).label || d[1])}</td><td>${d[2]}</td><td>${fmtV(d[3])}</td><td>${fmtV(d[4])}</td></tr>`).join("")}</tbody></table></div>
+        ${p.diffs.length > 400 ? `<p class="muted small">… e mais ${p.diffs.length - 400}.</p>` : ""}</details>` : ""}
+      <div class="savebar">
+        <span class="muted small">Substitui as folhas <strong>Indicadores</strong> e <strong>Dados</strong> do Google Sheet pelo conteúdo do Excel. Fica registado no Histórico.</span>
+        <button class="btn btn-primary" id="impGo" type="button">${st.demo ? "Aplicar (demonstração)" : "Importar para o Google Sheet"}</button>
+      </div>`;
+    const keep = $("#impKeep");
+    if (keep) keep.onchange = () => { importPlan = buildPlan(p.res, keep.checked, p.fileName); const k = keep.checked; renderImportPreview(); $("#impKeep").checked = k; };
+    $("#impGo").onclick = () => {
+      if (!confirm("Substituir os indicadores e os dados do Google Sheet pelo conteúdo deste Excel?")) return;
+      guarded($("#impGo"), async () => { await backend().importRFW(importPlan); importPlan = null; st.tab = "dados"; },
+        "Excel importado: " + importPlan.res.indicadores.length + " indicadores e " + importPlan.res.dados.length + " linhas de dados.");
+    };
+  }
+
   // ---------- Indicadores ----------
   function paneIndicadores() {
     const isNew = st.indForm === "new";
     if (!isNew && (!st.codigo || !Data.ind(st.codigo))) st.codigo = (Data.state.indicadores[0] || {}).codigo;
-    const ind = isNew ? { codigo: "", componente: (Data.componentes()[1] || {}).id || "", pai: "", nome: "", descricao: "", unidade: "", metaFinal: null, agregacao: "ultimo", responsavel: "" } : Data.ind(st.codigo);
+    const ind = isNew ? { codigo: "", componente: (Data.componentes()[1] || {}).id || "", pai: "", nome: "", descricao: "", unidade: "", metaFinal: null, agregacao: "ultimo", responsavel: "", tipo: "", linhaBase: null } : Data.ind(st.codigo);
     const comps = Data.componentes();
     const principais = Data.state.indicadores.filter((i) => !i.pai);
     $("#edPane").innerHTML = `
@@ -527,11 +723,13 @@
           <div class="form-row"><label for="f_nome">Nome</label><input type="text" id="f_nome" name="nome" value="${esc(ind.nome)}" required></div>
           <div class="form-row"><label for="f_descricao">Descrição e metodologia</label><textarea id="f_descricao" name="descricao">${esc(ind.descricao)}</textarea></div>
           <div class="form-grid">
-            <div class="form-row"><label for="f_unidade">Unidade</label><input type="text" id="f_unidade" name="unidade" value="${esc(ind.unidade)}" placeholder="%, ha, km, nº…"></div>
+            <div class="form-row"><label for="f_unidade">Unidade</label><input type="text" id="f_unidade" name="unidade" value="${esc(ind.unidade)}" placeholder="percentagem, ha, km, nº…"></div>
             <div class="form-row"><label for="f_meta_final">Meta final (opcional)</label><input type="text" inputmode="decimal" id="f_meta_final" name="meta_final" value="${ind.metaFinal ?? ""}"></div>
             <div class="form-row"><label for="f_agregacao">Cálculo do alcance</label><select class="inp" id="f_agregacao" name="agregacao">
               ${[["ultimo", "Último valor vs meta do ano"], ["acumulado", "Soma dos anos vs meta final"], ["media", "Média dos anos"]].map(([k, l]) => `<option value="${k}"${k === ind.agregacao ? " selected" : ""}>${l}</option>`).join("")}</select></div>
             <div class="form-row"><label for="f_responsavel">Responsável</label><input type="text" id="f_responsavel" name="responsavel" value="${esc(ind.responsavel)}"></div>
+            <div class="form-row"><label for="f_tipo">Tipo</label><input type="text" id="f_tipo" name="tipo" value="${esc(ind.tipo || "")}" placeholder="Desempenho, Resultados Intermédios…"></div>
+            <div class="form-row"><label for="f_linha_base">Linha de base</label><input type="text" inputmode="decimal" id="f_linha_base" name="linha_base" value="${ind.linhaBase ?? ""}"></div>
           </div>
           <div class="savebar">
             <span class="muted small">${isNew ? "Depois de criar, registe as metas e valores em Dados anuais." : "Alterações aos metadados do indicador."}</span>
@@ -549,6 +747,8 @@
       if (!form.codigo || !form.nome) { App.toast("Código e nome são obrigatórios.", "err"); return; }
       if (form.meta_final !== "" && Data.num(form.meta_final) === null) { App.toast("Meta final inválida.", "err"); return; }
       form.meta_final = form.meta_final === "" ? "" : Data.num(form.meta_final);
+      if (form.linha_base !== "" && Data.num(form.linha_base) === null) { App.toast("Linha de base inválida.", "err"); return; }
+      form.linha_base = form.linha_base === "" ? "" : Data.num(form.linha_base);
       guarded($("#edSaveInd"), async () => {
         await backend().saveIndicador(form, isNew);
         st.codigo = form.codigo; st.indForm = null;

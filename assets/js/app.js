@@ -48,7 +48,7 @@
     const sel = $("#refYear");
     const cur = Data.refYear;
     sel.innerHTML = `<option value="">Último disponível</option>` +
-      Data.state.years.slice().reverse().map((y) => `<option value="${y}">${y}</option>`).join("");
+      Data.state.years.slice().reverse().map((y) => `<option value="${y}">${esc(Data.periodo(y, true))}</option>`).join("");
     sel.value = cur ? String(cur) : "";
     sel.onchange = () => { Data.refYear = sel.value ? Number(sel.value) : null; route(); };
 
@@ -225,7 +225,7 @@
             <dl class="mini">
               <div><dt>Realizado</dt><dd>${Data.fmt(a.real, ind.unidade)}</dd></div>
               <div><dt>Meta</dt><dd>${Data.fmt(a.meta, ind.unidade)}</dd></div>
-              <div><dt>Ano</dt><dd>${a.ano ?? "—"}</dd></div>
+              <div><dt>Período</dt><dd>${a.ano ? esc(Data.periodo(a.ano)) : "—"}</dd></div>
             </dl>
           </div>
           <p class="muted small">${esc(ind.descricao)}</p>
@@ -260,7 +260,7 @@
       const cells = anos.map((y) => {
         const p = Data.pctAno(ind.codigo, y);
         const st = Data.status(p);
-        return `<td class="cell st-${st.key}" title="${esc(ind.codigo)} · ${y}: ${st.label}">${p === null ? "" : Data.fmtPct(p)}</td>`;
+        return `<td class="cell st-${st.key}" title="${esc(ind.codigo)} · ${esc(Data.periodo(y, true))}: ${st.label}">${p === null ? "" : Data.fmtPct(p)}</td>`;
       }).join("");
       const link = "#/c/" + enc(ind.componente) + "/" + enc(ind.codigo);
       const isPri = ind.componente === "PRI";
@@ -274,7 +274,7 @@
         <div class="card-head">
           <div>
             <h2>Matriz do progresso anual dos indicadores</h2>
-            <p class="muted small">Realizado em % da meta de cada ano. A última coluna é o alcance geral segundo a regra de cada indicador.</p>
+            <p class="muted small">Realizado em % da meta de cada período. A última coluna é o alcance geral segundo a regra de cada indicador.</p>
           </div>
           <div class="card-tools">
             <select id="resumoComp" aria-label="Filtrar por componente">
@@ -290,10 +290,10 @@
           <span class="lg st-bad">${ICON.bad}&lt; ${window.APP_CONFIG.LIMIARES.emCurso}% atrasado</span>
           <span class="lg st-none">${ICON.none}sem medição</span>
         </div>
-        <p class="scroll-hint">Deslize a tabela para o lado para ver todos os anos →</p>
+        <p class="scroll-hint">Deslize a tabela para o lado para ver todos os períodos →</p>
         <div class="table-wrap">
           <table class="matrix">
-            <thead><tr><th scope="col">Indicador</th>${anos.map((y) => `<th scope="col">${y}</th>`).join("")}<th scope="col">Alcance</th></tr></thead>
+            <thead><tr><th scope="col">Indicador</th>${anos.map((y) => `<th scope="col" title="${esc(Data.periodo(y, true))}">${esc(Data.periodo(y))}</th>`).join("")}<th scope="col">Alcance</th></tr></thead>
             <tbody>${body}</tbody>
           </table>
         </div>
@@ -304,7 +304,7 @@
     $("#resumoComp").onchange = (e) => { resumoFiltro = e.target.value; renderInicio("resumo"); };
     $("#btnCsv").onclick = () => {
       const anos = Data.anos();
-      const lines = [["componente", "codigo", "indicador", ...anos.map(String), "alcance_geral"]];
+      const lines = [["componente", "codigo", "indicador", ...anos.map((y) => Data.periodo(y, true)), "alcance_geral"]];
       matrixRows().forEach(({ comp, ind }) => {
         const a = Data.alcance(ind.codigo);
         const f = (p) => (p === null ? "" : (Math.round(p * 10) / 10).toString());
@@ -363,12 +363,19 @@
   }
 
   function shortName(k) {
-    const m = k.nome.match(/[–-]\s*([^–-]+)$/);
-    if (m) return m[1].trim();
-    const p = k.nome.match(/\(([^)]+)\)\s*$/);
-    if (p) return p[1].trim();
+    const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
+    const p = k.nome.match(/\(([^()]+)\)\s*\.?\s*$/);            // "… (mulheres)"
+    if (p) return cap(p[1].trim());
+    const m = k.nome.match(/\s[–-]\s+([^–]+)$/);                 // "… – Mulheres"
+    if (m) return cap(m[1].trim());
+    const w = k.nome.match(/\b(Proazul|ProAzul|Biofund|Fnds|FNDS)\s*$/i); // "… Biofund"
+    if (w) return w[1].toUpperCase() === "FNDS" ? "FNDS" : w[1].toLowerCase() === "proazul" ? "ProAzul" : "Biofund";
+    const l = k.nome.match(/\s(?:na|no|em)\s+(\S+)\s*$/);        // "… na Zambézia"
+    if (l) return cap(l[1]);
     return k.codigo;
   }
+
+
 
   function indicatorView(ind) {
     const a = Data.alcance(ind.codigo);
@@ -383,8 +390,10 @@
           <h2>${esc(ind.nome)}</h2>
           <p>${esc(ind.descricao)}</p>
           <dl class="meta-list">
-            ${ind.unidade ? `<div><dt>Unidade</dt><dd>${esc(ind.unidade)}</dd></div>` : ""}
+            ${ind.unidade ? `<div><dt>Unidade</dt><dd>${ind.pct ? "%" : esc(ind.unidade)}</dd></div>` : ""}
             ${ind.responsavel ? `<div><dt>Responsável</dt><dd>${esc(ind.responsavel)}</dd></div>` : ""}
+            ${ind.tipo ? `<div><dt>Tipo</dt><dd>${esc(ind.tipo)}</dd></div>` : ""}
+            ${ind.linhaBase !== null && ind.linhaBase !== undefined ? `<div><dt>Linha de base</dt><dd>${Data.fmt(ind.linhaBase, ind.linhaBase > 100 ? "" : ind.unidade)}</dd></div>` : ""}
             <div><dt>Cálculo do alcance</dt><dd>${esc(regra)}</dd></div>
             ${ind.metaFinal !== null ? `<div><dt>Meta final</dt><dd>${Data.fmt(ind.metaFinal, ind.unidade)}</dd></div>` : ""}
           </dl>
@@ -394,23 +403,23 @@
           ${Charts.gauge(a, ind.unidade)}
           <div class="gauge-foot">
             ${pill(a.status)}
-            <p><strong>${Data.fmt(a.real, ind.unidade)}</strong> de ${Data.fmt(a.meta, ind.unidade)}${a.ano ? ` <span class="muted">(${a.ano})</span>` : ""}</p>
+            <p><strong>${Data.fmt(a.real, ind.unidade)}</strong> de ${Data.fmt(a.meta, ind.unidade)}${a.ano ? ` <span class="muted">(${esc(Data.periodo(a.ano))})</span>` : ""}</p>
             ${a.pctFinal !== null ? `<p class="muted small">${Data.fmtPct(a.pctFinal)} da meta final do projecto</p>` : ""}
           </div>
         </article>
         <article class="card ind-chart">
           <div class="card-head">
-            <h3>Meta vs realizado por ano</h3>
+            <h3>Meta vs realizado por período</h3>
             <button class="btn btn-ghost btn-sm" type="button" id="toggleTable" aria-expanded="false">Ver tabela</button>
           </div>
-          ${rows.length ? `<div class="chart-box"><canvas id="barChart" aria-label="Gráfico de barras: meta e realizado por ano de ${esc(ind.codigo)}" role="img"></canvas></div>` : `<p class="empty">Ainda não há dados anuais para este indicador.</p>`}
+          ${rows.length ? `<div class="chart-box"><canvas id="barChart" aria-label="Gráfico de barras: meta e realizado por período de ${esc(ind.codigo)}" role="img"></canvas></div>` : `<p class="empty">Ainda não há dados para este indicador.</p>`}
           <div class="table-wrap" id="indTable" hidden>
             <table class="data">
-              <thead><tr><th scope="col">Ano</th><th scope="col">Meta</th><th scope="col">Realizado</th><th scope="col">% da meta</th></tr></thead>
-              <tbody>${rows.map((r) => { const p = Data.pctAno(ind.codigo, r.ano); const st = Data.status(p); return `<tr><th scope="row">${r.ano}</th><td>${Data.fmt(r.meta, ind.unidade)}</td><td>${Data.fmt(r.real, ind.unidade)}</td><td><span class="dot st-${st.key}"></span>${Data.fmtPct(p)}</td></tr>`; }).join("")}</tbody>
+              <thead><tr><th scope="col">Período</th><th scope="col">Meta</th><th scope="col">Realizado</th><th scope="col">% da meta</th></tr></thead>
+              <tbody>${rows.map((r) => { const p = Data.pctAno(ind.codigo, r.ano); const st = Data.status(p); return `<tr><th scope="row">${esc(Data.periodo(r.ano, true))}</th><td>${Data.fmt(r.meta, ind.unidade)}</td><td>${Data.fmt(r.real, ind.unidade)}</td><td><span class="dot st-${st.key}"></span>${Data.fmtPct(p)}</td></tr>`; }).join("")}</tbody>
             </table>
           </div>
-          ${notas.length ? `<ul class="notes">${notas.map((n) => `<li><strong>${n.ano}:</strong> ${esc(n.nota)}</li>`).join("")}</ul>` : ""}
+          ${notas.length ? `<ul class="notes">${notas.map((n) => `<li><strong>${esc(Data.periodo(n.ano))}:</strong> ${esc(n.nota)}</li>`).join("")}</ul>` : ""}
         </article>
         ${loc.length ? `
         <article class="card ind-map">

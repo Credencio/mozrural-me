@@ -44,8 +44,9 @@
     const rows = Data.serie(codigo);
     const p = palette(forPrint);
     const unidade = ind ? ind.unidade : "";
-    const labels = rows.map((r) => String(r.ano));
-    const fmt = (v) => Data.fmtCompact(v) + (unidade === "%" ? "%" : "");
+    const labels = rows.map((r) => Data.periodo(r.ano));
+    const pct = Data.isPctUnit(unidade);
+    const fmt = (v) => Data.fmtCompact(v) + (Data.isPctUnit(unidade) ? "%" : "");
     const narrow = !forPrint && window.innerWidth < 600;
     return {
       type: "bar",
@@ -72,11 +73,12 @@
             backgroundColor: forPrint ? "#fff" : css("--surface-raised"),
             titleColor: p.ink, bodyColor: p.ink, borderColor: p.grid, borderWidth: 1, padding: 10,
             callbacks: {
+              title: (items) => Data.periodo(rows[items[0].dataIndex].ano, true),
               label: (c) => " " + c.dataset.label + ": " + (c.raw === null ? "sem dados" : Data.fmt(c.raw, unidade)),
               afterBody: (items) => {
-                const ano = Number(items[0].label);
-                const pct = Data.pctAno(codigo, ano);
-                return pct === null ? "" : "Alcance no ano: " + Data.fmtPct(pct);
+                const ano = rows[items[0].dataIndex].ano;
+                const pc = Data.pctAno(codigo, ano);
+                return pc === null ? "" : "Alcance no período: " + Data.fmtPct(pc);
               }
             }
           },
@@ -88,7 +90,7 @@
             beginAtZero: true, grace: "8%",
             grid: { color: p.grid }, border: { display: false },
             ticks: { color: p.muted, maxTicksLimit: 5, font: { family: "'Public Sans', system-ui, sans-serif", size: forPrint ? 12 : 11 }, callback: (v) => Data.fmtCompact(v) },
-            title: { display: !!unidade, text: unidade, color: p.muted, font: { family: "'Public Sans', system-ui, sans-serif", size: 11 } }
+            title: { display: !!unidade, text: pct ? "%" : unidade, color: p.muted, font: { family: "'Public Sans', system-ui, sans-serif", size: 11 } }
           }
         }
       },

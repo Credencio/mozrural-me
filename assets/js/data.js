@@ -36,15 +36,71 @@
   }
 
   const clean = (v) => (v === null || v === undefined ? "" : String(v).trim());
+  const isPctUnit = (u) => /%|percent/i.test(String(u || ""));
+  /** Código canónico para comparar ("IRI1.1 ", "IRI 1.1" e "IRI 1.1 (emergencia)" são o mesmo). */
+  const canon = (c) => String(c ?? "").replace(/\(.*?\)/g, "").replace(/\s+/g, "").toUpperCase();
+  /** Valor de um indicador em percentagem: 0,85 (fracção) ou "85%" ou 85 -> 85. */
+  function numPct(raw) {
+    const v = num(raw);
+    if (v === null) return null;
+    const hasSign = typeof raw === "string" && raw.includes("%");
+    return !hasSign && Math.abs(v) <= 1.5 && v !== 0 ? Math.round(v * 10000) / 100 : v;
+  }
 
+  /** "1=Ano 1 (Jun 21 - Jun 22); 2=…" -> {1: {curto:"Ano 1", longo:"Ano 1 (Jun 21 - Jun 22)"}} */
+  function parsePeriodos(txt) {
+    const out = {};
+    String(txt || "").split(/;|\n/).forEach((part) => {
+      const m = part.match(/^\s*(\d+)\s*=\s*(.+?)\s*$/);
+      if (!m) return;
+      const longo = m[2];
+      out[+m[1]] = { curto: longo.replace(/\s*\(.*$/, "") || longo, longo };
+    });
+    return out;
+  }
+
+  const BASE = () => "https://docs.google.com/spreadsheets/d/" + encodeURIComponent(C.SHEET_ID);
   function gvizUrl(sheet) {
-    return "https://docs.google.com/spreadsheets/d/" + encodeURIComponent(C.SHEET_ID) +
-      "/gviz/tq?tqx=out:csv&headers=1&sheet=" + encodeURIComponent(sheet) + "&_=" + Date.now();
+    return BASE() + "/gviz/tq?tqx=out:csv&headers=1&sheet=" + encodeURIComponent(sheet) + "&_=" + Date.now();
+  }
+
+  /*
+   * Mapa nome-da-folha -> gid, lido da vista pública do Sheet.
+   * A exportação CSV por gid devolve as células tal como aparecem no Sheet. O endpoint "gviz" (usado só como
+   * alternativa) adivinha o tipo de cada coluna e APAGA as células de texto numa coluna numérica
+   * (ex.: "68,62%" ou "25,5" escritos à mão), que era a causa de valores em falta.
+   */
+  let gidPromise = null;
+  function gidMap() {
+    if (!gidPromise) {
+      gidPromise = fetch(BASE() + "/htmlview?_=" + Date.now(), { cache: "no-store" })
+        .then((r) => (r.ok ? r.text() : ""))
+        .then((html) => {
+          const map = {};
+          const re = /items\.push\(\{name: "((?:[^"\\]|\\.)*)", pageUrl: "[^"]*", gid: "(\d+)"/g;
+          let m;
+          while ((m = re.exec(html))) { try { map[JSON.parse('"' + m[1] + '"')] = m[2]; } catch (_) { map[m[1]] = m[2]; } }
+          return map;
+        })
+        .catch(() => ({}));
+    }
+    return gidPromise;
   }
 
   async function fetchTab(key) {
     const sheet = S[key];
-    const url = C.SHEET_ID ? gvizUrl(sheet) : "dados-exemplo/" + encodeURIComponent(sheet) + ".csv";
+    let url;
+    if (!C.SHEET_ID) url = "dados-exemplo/" + encodeURIComponent(sheet) + ".csv";
+    else {
+      const gids = await gidMap();
+      url = gids[sheet] !== undefined
+        ? BASE() + "/export?format=csv&gid=" + gids[sheet] + "&_=" + Date.now()
+        : gvizUrl(sheet);
+      if (gids[sheet] === undefined && Object.keys(gids).length) {
+        if (key === "locais") return [];
+        throw new Error("A folha \"" + sheet + "\" não existe no Google Sheet.");
+      }
+    }
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) throw new Error("Não foi possível ler a folha \"" + sheet + "\" (HTTP " + res.status + ").");
     const text = await res.text();
@@ -53,6 +109,7 @@
     }
     const parsed = Papa.parse(text, { header: true, skipEmptyLines: "greedy", transformHeader: (h) => h.trim().toLowerCase() });
     const rows = parsed.data;
+    if (C.SHEET_ID) D.leitura = /export\?format=csv/.test(url) ? "export" : "gviz";
     // O endpoint gviz devolve a 1.ª folha quando o nome não existe: confirmar os cabeçalhos.
     const need = HEADERS[key] || [];
     const fields = parsed.meta.fields || [];
@@ -96,21 +153,42 @@
         codigo: clean(r.codigo), componente: clean(r.componente), pai: clean(r.pai),
         nome: clean(r.nome), descricao: clean(r.descricao), unidade: clean(r.unidade),
         metaFinal: num(r.meta_final), agregacao: (clean(r.agregacao) || "ultimo").toLowerCase(),
-        responsavel: clean(r.responsavel), ordem: i
+        responsavel: clean(r.responsavel), tipo: clean(r.tipo), linhaBase: num(r.linha_base), ordem: i
       }));
-    st.indicadores.forEach((ind) => { st.byCode[ind.codigo] = ind; });
+    st.byCanon = {};
+    st.indicadores.forEach((ind) => {
+      ind.pai = ind.pai ? ind.pai : "";
+      ind.pct = isPctUnit(ind.unidade);
+      if (ind.pct && ind.metaFinal !== null) ind.metaFinal = numPct(ind.metaFinal);
+      st.byCode[ind.codigo] = ind;
+      st.byCanon[canon(ind.codigo)] = ind;
+    });
+    // pai escrito de outra forma ("IRI1.2" vs "IRI 1.2")
+    st.indicadores.forEach((ind) => { if (ind.pai && !st.byCode[ind.pai] && st.byCanon[canon(ind.pai)]) ind.pai = st.byCanon[canon(ind.pai)].codigo; });
 
     const years = new Set();
+    st.orfaos = [];
     (raw.dados || []).forEach((r) => {
-      const codigo = clean(r.codigo), ano = num(r.ano);
-      if (!codigo || ano === null) return;
-      (st.dados[codigo] = st.dados[codigo] || []).push({
-        ano: Math.round(ano), meta: num(r.meta), real: num(r.realizado), nota: clean(r.nota)
+      const raw_c = clean(r.codigo), ano = num(r.ano);
+      if (!raw_c || ano === null) return;
+      const ind = st.byCode[raw_c] || st.byCanon[canon(raw_c)];
+      if (!ind) { if (!st.orfaos.includes(raw_c)) st.orfaos.push(raw_c); return; }
+      const conv = ind.pct ? numPct : num;
+      (st.dados[ind.codigo] = st.dados[ind.codigo] || []).push({
+        ano: Math.round(ano), meta: conv(r.meta), real: conv(r.realizado), nota: clean(r.nota)
       });
       years.add(Math.round(ano));
     });
+    if (st.orfaos.length) console.warn("Linhas da folha Dados com códigos que não existem na folha Indicadores:", st.orfaos);
+    // anos repetidos para o mesmo indicador: fica a última linha
+    Object.keys(st.dados).forEach((k) => {
+      const by = new Map();
+      st.dados[k].forEach((r) => by.set(r.ano, r));
+      st.dados[k] = [...by.values()];
+    });
     Object.values(st.dados).forEach((rows) => rows.sort((a, b) => a.ano - b.ano));
     st.years = [...years].sort((a, b) => a - b);
+    st.periodos = parsePeriodos(st.projecto.periodos || C.PERIODOS);
 
     (raw.locais || []).forEach((r) => {
       const codigo = clean(r.codigo), lat = num(r.latitude), lng = num(r.longitude);
@@ -126,7 +204,7 @@
   const D = {
     state: null,
     refYear: null, // null = último ano disponível
-    num, clean,
+    num, clean, canon, numPct, isPctUnit, parsePeriodos,
 
     async load() {
       const raw = await loadRemote();
@@ -145,7 +223,13 @@
 
     componentes() { return D.state.componentes; },
     componente(id) { return D.state.componentes.find((c) => c.id === id); },
-    ind(codigo) { return D.state.byCode[codigo]; },
+    ind(codigo) { return D.state.byCode[codigo] || D.state.byCanon[canon(codigo)]; },
+    /** Rótulo de um período: "Ano 1", "Final"… (ou o ano, quando não há períodos definidos). */
+    periodo(ano, longo) {
+      const p = D.state && D.state.periodos[ano];
+      if (p) return longo ? p.longo : p.curto;
+      return ano > 1900 || !Object.keys((D.state && D.state.periodos) || {}).length ? String(ano) : "Período " + ano;
+    },
     /** Indicadores principais (sem pai) de um componente. */
     principais(compId) { return D.state.indicadores.filter((i) => i.componente === compId && !i.pai); },
     filhos(codigo) { return D.state.indicadores.filter((i) => i.pai === codigo); },
@@ -225,7 +309,7 @@
       if (n === null || n === undefined || !isFinite(n)) return "—";
       const abs = Math.abs(n);
       const s = abs >= 1000 ? nf0.format(n) : nf.format(n);
-      return unidade && unidade.trim() === "%" ? s + "%" : s;
+      return isPctUnit(unidade) ? s + "%" : s;
     },
     fmtPct(p) {
       if (p === null || p === undefined || !isFinite(p)) return "—";

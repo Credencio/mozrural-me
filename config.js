@@ -34,6 +34,10 @@ window.APP_CONFIG = {
     "MozRural": "assets/img/logos/mozrural.png"
   },
 
+  // Períodos do quadro de resultados (usados quando a folha Projecto não tem a chave "periodos").
+  // Formato: número=rótulo; o texto antes do parêntese é o rótulo curto dos gráficos.
+  PERIODOS: "1=Ano 1 (Jun 21 - Jun 22); 2=Ano 2 (Jun 22 - Jun 23); 3=Ano 3 (Jun 23 - Jun 24); 4=Ano 4 (Jun 24 - Jun 25); 5=Ano 5 (Jun 25 - Jun 26); 6=Final (Dez 26)",
+
   // Limiares do estado de cada indicador (percentagem da meta).
   LIMIARES: { atingido: 100, emCurso: 70 }
 };
