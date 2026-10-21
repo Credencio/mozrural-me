@@ -134,7 +134,7 @@
           <p class="eyebrow">${esc(P.sigla || "")}</p>
           <h1>${esc(P.nome || "Projecto")}</h1>
         </div>
-        ${kpiStrip(Data.topo().map((i) => i.codigo))}
+        ${kpiStrip(Data.topo().map((i) => i.codigo), "Resumo geral")}
       </section>`;
     const t = tabs([
       { id: "descricao", label: "Descrição", href: "#/inicio/descricao" },
@@ -152,21 +152,63 @@
       .catch((e) => { mapEl.innerHTML = `<p class="muted small">${esc(e.message)}</p>`; });
   }
 
-  function kpiStrip(codes) {
+  // Listas de indicadores por estado, para abrir ao clicar nos números do resumo
+  const kpiSets = {};
+  let kpiSeq = 0;
+
+  function kpiStrip(codes, titulo) {
     const counts = { good: 0, warn: 0, bad: 0, none: 0 };
     codes.forEach((c) => { counts[Data.alcance(c).status.key]++; });
     const total = codes.length;
     const seg = (k) => total ? (counts[k] / total) * 100 : 0;
+    const id = "k" + (++kpiSeq);
+    kpiSets[id] = { codes, titulo: titulo || "" };
+    const btn = (key, n, label, cls) =>
+      `<button type="button" class="kpi ${cls || ""}" data-kpi="${id}" data-st="${key}" aria-haspopup="dialog" title="Ver os indicadores">
+        <span class="kpi-n">${n}</span><span class="kpi-l">${label}</span></button>`;
     return `
-      <div class="kpis" aria-label="Estado dos indicadores">
-        <div class="kpi"><span class="kpi-n">${total}</span><span class="kpi-l">indicadores principais</span></div>
-        <div class="kpi st-good"><span class="kpi-n">${counts.good}</span><span class="kpi-l">${ICON.good}Atingidos</span></div>
-        <div class="kpi st-warn"><span class="kpi-n">${counts.warn}</span><span class="kpi-l">${ICON.warn}Em curso</span></div>
-        <div class="kpi st-bad"><span class="kpi-n">${counts.bad}</span><span class="kpi-l">${ICON.bad}Atrasados</span></div>
+      <div class="kpis" aria-label="Estado dos indicadores (clique num número para ver a lista)">
+        ${btn("all", total, "indicadores principais")}
+        ${btn("good", counts.good, ICON.good + "Atingidos", "st-good")}
+        ${btn("warn", counts.warn, ICON.warn + "Em curso", "st-warn")}
+        ${btn("bad", counts.bad, ICON.bad + "Atrasados", "st-bad")}
         <div class="kpi-bar" role="img" aria-label="${counts.good} atingidos, ${counts.warn} em curso, ${counts.bad} atrasados, ${counts.none} sem dados">
           <i class="st-good" style="width:${seg("good")}%"></i><i class="st-warn" style="width:${seg("warn")}%"></i><i class="st-bad" style="width:${seg("bad")}%"></i><i class="st-none" style="width:${seg("none")}%"></i>
         </div>
       </div>`;
+  }
+
+  const ST_NOMES = { good: "Atingidos", warn: "Em curso", bad: "Atrasados", none: "Sem dados" };
+  let kpiLastFocus = null;
+
+  function openKpiList(setId, key, opener) {
+    const set = kpiSets[setId];
+    if (!set) return;
+    const items = set.codes.map((c) => ({ ind: Data.ind(c), a: Data.alcance(c) })).filter((x) => x.ind);
+    const grupos = key === "all" ? ["bad", "warn", "good", "none"] : [key];
+    const linha = ({ ind, a }) => `
+      <li><a href="#/c/${enc(ind.componente)}/${enc(ind.codigo)}" class="kl-item">
+        <span class="code">${esc(ind.codigo)}</span>
+        <span class="kl-nome">${esc(ind.nome)}</span>
+        <span class="kl-val"><strong>${Data.fmtPct(a.pct)}</strong><small>${Data.fmt(a.real, ind.unidade)} de ${Data.fmt(a.meta, ind.unidade)}${a.ano ? " · " + esc(Data.periodo(a.ano)) : ""}</small></span>
+      </a></li>`;
+    const corpo = grupos.map((g) => {
+      const lst = items.filter((x) => x.a.status.key === g)
+        .sort((x, y) => (g === "good" ? (y.a.pct ?? 0) - (x.a.pct ?? 0) : (x.a.pct ?? 0) - (y.a.pct ?? 0)));
+      if (!lst.length) return key === "all" ? "" : `<p class="muted">Nenhum indicador neste estado.</p>`;
+      return `${key === "all" ? `<h3 class="kl-grupo">${App.pill({ key: g, label: ST_NOMES[g] })} <span class="muted small">${lst.length}</span></h3>` : ""}<ul class="kl-list">${lst.map(linha).join("")}</ul>`;
+    }).join("");
+    const n = key === "all" ? items.length : items.filter((x) => x.a.status.key === key).length;
+    $("#kpiTitle").innerHTML = (key === "all" ? "Indicadores principais" : App.pill({ key, label: ST_NOMES[key] })) + ` <span class="muted">(${n})</span>`;
+    $("#kpiSub").textContent = (set.titulo ? set.titulo + " · " : "") + (Data.refYear ? "até " + Data.periodo(Data.refYear, true) : "último período disponível") + " · clique num indicador para o abrir";
+    $("#kpiBody").innerHTML = corpo;
+    kpiLastFocus = opener || document.activeElement;
+    $("#kpiModal").hidden = false;
+    $("#kpiModal .modal-panel").focus();
+  }
+  function closeKpiList() {
+    $("#kpiModal").hidden = true;
+    if (kpiLastFocus && document.contains(kpiLastFocus)) kpiLastFocus.focus();
   }
 
   function areaHtml(txt) {
@@ -331,7 +373,7 @@
           <h1>${esc(comp.nome)}</h1>
           ${comp.descricao ? `<p class="lede">${esc(comp.descricao)}</p>` : ""}
         </div>
-        ${comp.estado !== "brevemente" ? kpiStrip(Data.principais(id).map((i) => i.codigo)) : ""}
+        ${comp.estado !== "brevemente" ? kpiStrip(Data.principais(id).map((i) => i.codigo), comp.nome) : ""}
       </section>`;
 
     if (comp.estado === "brevemente") {
@@ -469,6 +511,13 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     $("#btnPdf").onclick = () => window.Report && Report.export();
+    // números do resumo -> lista de indicadores
+    document.addEventListener("click", (e) => {
+      const k = e.target.closest("[data-kpi]");
+      if (k) { openKpiList(k.dataset.kpi, k.dataset.st, k); return; }
+      if (e.target.closest("#kpiModal [data-close]") || e.target.closest("#kpiModal .kl-item")) closeKpiList();
+    });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#kpiModal").hidden) closeKpiList(); });
     // menu de secções no telemóvel
     const nav = document.querySelector(".sidenav");
     const tog = $("#navToggle");
