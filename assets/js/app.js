@@ -134,7 +134,7 @@
           <p class="eyebrow">${esc(P.sigla || "")}</p>
           <h1>${esc(P.nome || "Projecto")}</h1>
         </div>
-        ${kpiStrip(Data.topo().map((i) => i.codigo), "Resumo geral")}
+        ${kpiStrip(Data.resumo().map((i) => i.codigo), "Resumo geral")}
       </section>`;
     const t = tabs([
       { id: "descricao", label: "Descrição", href: "#/inicio/descricao" },
@@ -373,7 +373,7 @@
           <h1>${esc(comp.nome)}</h1>
           ${comp.descricao ? `<p class="lede">${esc(comp.descricao)}</p>` : ""}
         </div>
-        ${comp.estado !== "brevemente" ? kpiStrip(Data.principais(id).map((i) => i.codigo), comp.nome) : ""}
+        ${comp.estado !== "brevemente" ? kpiStrip(Data.resumo(id).map((i) => i.codigo), comp.nome) : ""}
       </section>`;
 
     if (comp.estado === "brevemente") {
