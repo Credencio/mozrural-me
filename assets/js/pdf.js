@@ -116,7 +116,7 @@
     doc.text(t((P.actualizacao ? "Dados actualizados em " + Data.fmtDate(P.actualizacao) + "  ·  " : "") + refTxt), M, 113);
 
     y = 136;
-    const all = Data.topo().map((i) => i.codigo); // só indicadores de topo (código sem ponto)
+    const all = Data.resumo().map((i) => i.codigo); // sem as desagregações de mulheres e jovens
     const counts = { good: 0, warn: 0, bad: 0, none: 0 };
     all.forEach((c) => counts[Data.alcance(c).status.key]++);
     const boxes = [
@@ -282,7 +282,7 @@
       if (!inds.length) { para("Sem indicadores.", 10, MUTED); continue; }
 
       // resumo do componente (como no site: só indicadores principais, sem desagregações)
-      const princ = Data.principais(c.id).map((i) => i.codigo);
+      const princ = Data.resumo(c.id).map((i) => i.codigo);
       const cc = { good: 0, warn: 0, bad: 0, none: 0 };
       princ.forEach((cod) => cc[Data.alcance(cod).status.key]++);
       const chips = [
