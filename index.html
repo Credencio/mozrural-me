@@ -87,6 +87,21 @@
     </section>
   </div>
 
+  <!-- Lista de indicadores de um número do resumo -->
+  <div class="modal" id="kpiModal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="kpiTitle" tabindex="-1">
+      <header class="modal-head">
+        <div>
+          <h2 id="kpiTitle"></h2>
+          <p class="muted small" id="kpiSub"></p>
+        </div>
+        <button class="icon-btn" data-close aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </header>
+      <div class="modal-body" id="kpiBody"></div>
+    </section>
+  </div>
+
   <div class="toast" id="toast" role="status" hidden></div>
 
   <!-- Bibliotecas incluídas localmente (sem dependência de CDN) -->
