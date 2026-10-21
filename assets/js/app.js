@@ -134,7 +134,7 @@
           <p class="eyebrow">${esc(P.sigla || "")}</p>
           <h1>${esc(P.nome || "Projecto")}</h1>
         </div>
-        ${kpiStrip(Data.state.indicadores.map((i) => i.codigo))}
+        ${kpiStrip(Data.topo().map((i) => i.codigo))}
       </section>`;
     const t = tabs([
       { id: "descricao", label: "Descrição", href: "#/inicio/descricao" },
@@ -159,7 +159,7 @@
     const seg = (k) => total ? (counts[k] / total) * 100 : 0;
     return `
       <div class="kpis" aria-label="Estado dos indicadores">
-        <div class="kpi"><span class="kpi-n">${total}</span><span class="kpi-l">indicadores</span></div>
+        <div class="kpi"><span class="kpi-n">${total}</span><span class="kpi-l">indicadores principais</span></div>
         <div class="kpi st-good"><span class="kpi-n">${counts.good}</span><span class="kpi-l">${ICON.good}Atingidos</span></div>
         <div class="kpi st-warn"><span class="kpi-n">${counts.warn}</span><span class="kpi-l">${ICON.warn}Em curso</span></div>
         <div class="kpi st-bad"><span class="kpi-n">${counts.bad}</span><span class="kpi-l">${ICON.bad}Atrasados</span></div>
@@ -331,7 +331,7 @@
           <h1>${esc(comp.nome)}</h1>
           ${comp.descricao ? `<p class="lede">${esc(comp.descricao)}</p>` : ""}
         </div>
-        ${comp.estado !== "brevemente" ? kpiStrip(Data.doComponente(id).map((i) => i.codigo)) : ""}
+        ${comp.estado !== "brevemente" ? kpiStrip(Data.principais(id).map((i) => i.codigo)) : ""}
       </section>`;
 
     if (comp.estado === "brevemente") {
