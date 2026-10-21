@@ -38,6 +38,10 @@ window.APP_CONFIG = {
   // Formato: número=rótulo; o texto antes do parêntese é o rótulo curto dos gráficos.
   PERIODOS: "1=Ano 1 (Jun 21 - Jun 22); 2=Ano 2 (Jun 22 - Jun 23); 3=Ano 3 (Jun 23 - Jun 24); 4=Ano 4 (Jun 24 - Jun 25); 5=Ano 5 (Jun 25 - Jun 26); 6=Final (Dez 26)",
 
+  // Desagregações que NÃO contam nos resumos (números do topo). O indicador é subindicador quando o nome
+  // termina com uma destas palavras, ex.: "… (mulheres)" ou "… – Jovens". Todos os outros contam como principais.
+  SUBINDICADORES: ["mulheres", "jovens", "homens"],
+
   // Limiares do estado de cada indicador (percentagem da meta).
   LIMIARES: { atingido: 100, emCurso: 70 }
 };
