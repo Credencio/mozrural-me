@@ -234,6 +234,8 @@
       if (p) return longo ? p.longo : p.curto;
       return ano > 1900 || !Object.keys((D.state && D.state.periodos) || {}).length ? String(ano) : "Período " + ano;
     },
+    /** Indicadores de topo: código sem ponto (PRI 1, RI 2, SC 4…) e que não são desagregação. */
+    topo() { return D.state.indicadores.filter((i) => !i.pai && !/\d\.\d/.test(i.codigo)); },
     /** Indicadores principais (sem pai) de um componente. */
     principais(compId) { return D.state.indicadores.filter((i) => i.componente === compId && !i.pai); },
     filhos(codigo) { return D.state.indicadores.filter((i) => i.pai === codigo); },
