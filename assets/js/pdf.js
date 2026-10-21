@@ -116,11 +116,11 @@
     doc.text(t((P.actualizacao ? "Dados actualizados em " + Data.fmtDate(P.actualizacao) + "  ·  " : "") + refTxt), M, 113);
 
     y = 136;
-    const all = Data.state.indicadores.map((i) => i.codigo);
+    const all = Data.topo().map((i) => i.codigo); // só indicadores de topo (código sem ponto)
     const counts = { good: 0, warn: 0, bad: 0, none: 0 };
     all.forEach((c) => counts[Data.alcance(c).status.key]++);
     const boxes = [
-      ["Indicadores", all.length, null],
+      ["Indicadores principais", all.length, null],
       ["Atingidos", counts.good, "good"],
       ["Em curso", counts.warn, "warn"],
       ["Atrasados", counts.bad, "bad"],
@@ -280,6 +280,26 @@
       if (c.estado === "brevemente") { para("Conteúdo disponível brevemente.", 11, INK, 2); continue; }
       const inds = Data.doComponente(c.id);
       if (!inds.length) { para("Sem indicadores.", 10, MUTED); continue; }
+
+      // resumo do componente (como no site: só indicadores principais, sem desagregações)
+      const princ = Data.principais(c.id).map((i) => i.codigo);
+      const cc = { good: 0, warn: 0, bad: 0, none: 0 };
+      princ.forEach((cod) => cc[Data.alcance(cod).status.key]++);
+      const chips = [
+        [princ.length + (princ.length === 1 ? " indicador principal" : " indicadores principais"), { fill: GREEN_SOFT, text: GREEN }],
+        [cc.good + (cc.good === 1 ? " atingido" : " atingidos"), ST.good], [cc.warn + " em curso", ST.warn], [cc.bad + (cc.bad === 1 ? " atrasado" : " atrasados"), ST.bad]
+      ].concat(cc.none ? [[cc.none + " sem dados", ST.none]] : []);
+      ensure(10);
+      let cx = M;
+      doc.setFont("helvetica", "bold"); doc.setFontSize(8.5);
+      chips.forEach(([txt, col]) => {
+        const w = doc.getTextWidth(txt) + 7;
+        doc.setFillColor(...col.fill); doc.setDrawColor(...LINE);
+        doc.roundedRect(cx, y - 4.2, w, 6.4, 3.2, 3.2, col === ST.none ? "FD" : "F");
+        doc.setTextColor(...col.text); doc.text(txt, cx + 3.5, y);
+        cx += w + 2.5;
+      });
+      y += 7;
 
       // resumo do componente
       doc.autoTable({
