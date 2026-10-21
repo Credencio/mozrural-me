@@ -234,8 +234,14 @@
       if (p) return longo ? p.longo : p.curto;
       return ano > 1900 || !Object.keys((D.state && D.state.periodos) || {}).length ? String(ano) : "Período " + ano;
     },
-    /** Indicadores de topo: código sem ponto (PRI 1, RI 2, SC 4…) e que não são desagregação. */
-    topo() { return D.state.indicadores.filter((i) => !i.pai && !/\d\.\d/.test(i.codigo)); },
+    /** Subindicador (não conta nos resumos): nome termina em "(mulheres)", "(jovens)", "– Mulheres"… */
+    eSub(ind) {
+      const pal = (C.SUBINDICADORES || ["mulheres", "jovens", "homens"]).map((w) => String(w).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase());
+      const nm = String(ind.nome || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      return pal.some((w) => new RegExp("[(–-]\\s*" + w + "\\s*\\)?\\s*\\.?\\s*$").test(nm));
+    },
+    /** Indicadores que contam nos resumos (todos menos os de mulheres/jovens). */
+    resumo(compId) { return D.state.indicadores.filter((i) => (!compId || i.componente === compId) && !D.eSub(i)); },
     /** Indicadores principais (sem pai) de um componente. */
     principais(compId) { return D.state.indicadores.filter((i) => i.componente === compId && !i.pai); },
     filhos(codigo) { return D.state.indicadores.filter((i) => i.pai === codigo); },
